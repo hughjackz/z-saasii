@@ -1,0 +1,8 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TriggerMessageReq",
+  "type": "object",
+  "properties": {},
+  "description": "This message does not contain any fields. Used for triggering a certificate signing request.",
+  "additionalProperties": false
+}

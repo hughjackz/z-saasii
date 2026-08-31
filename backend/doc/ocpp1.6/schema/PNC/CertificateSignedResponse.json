@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CertificateSignedConf",
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["Accepted", "Rejected"],
+      "description": "Required. Returns whether certificate signing has been accepted or rejected."
+    }
+  },
+  "required": ["status"],
+  "additionalProperties": false
+}

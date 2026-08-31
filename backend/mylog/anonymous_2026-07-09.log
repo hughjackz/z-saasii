@@ -1,0 +1,63 @@
+[00:00:48] [HTTP] - GET /login.asp 404
+[00:03:50] [HTTP] - CONNECT  404
+[00:27:53] [HTTP] - CONNECT  404
+[01:03:49] [HTTP] - GET / 404
+[01:13:44] [HTTP] - GET //admin/config.php 404
+[01:21:24] [HTTP] - GET //admin/config.php 404
+[01:41:56] [HTTP] - GET / 404
+[02:03:46] [HTTP] - HEAD / 404
+[02:22:39] [HTTP] - GET /SDK/webLanguage 404
+[04:16:14] [HTTP] - GET / 404
+[04:17:30] [HTTP] - GET / 404
+[04:30:23] [HTTP] - GET /SDK/webLanguage 404
+[04:33:39] [HTTP] - GET /SDK/webLanguage 404
+[04:34:16] [HTTP] - GET / 404
+[04:37:25] [HTTP] - GET / 404
+[05:08:34] [HTTP] - GET /.env 404
+[05:30:49] [HTTP] - GET / 404
+[05:31:00] [HTTP] - GET / 404
+[05:31:02] [HTTP] - PRI * 404
+[05:31:08] [HTTP] - GET /login 404
+[05:33:12] [HTTP] - CONNECT / 404
+[05:37:02] [HTTP] - GET / 404
+[05:45:18] [HTTP] - GET / 404
+[06:02:12] [HTTP] - GET /login.asp 404
+[06:03:16] [HTTP] - CONNECT  404
+[06:24:39] [HTTP] - POST / 404
+[06:36:43] [HTTP] - GET / 404
+[07:06:34] [HTTP] - GET / 404
+[07:23:47] [HTTP] - GET /login 404
+[09:32:28] [HTTP] - CONNECT  404
+[10:06:48] [HTTP] - GET / 404
+[10:35:58] [HTTP] - GET / 404
+[10:35:59] [HTTP] - GET /favicon.ico 404
+[10:50:04] [HTTP] - GET /.env 404
+[11:03:44] [HTTP] - GET / 404
+[11:03:54] [HTTP] - GET / 404
+[11:03:54] [HTTP] - PRI * 404
+[11:03:58] [HTTP] - GET /robots.txt 404
+[11:07:29] [HTTP] - GET / 404
+[11:24:47] [HTTP] - CONNECT  404
+[11:24:57] [HTTP] - GET /SDK/webLanguage 404
+[11:52:46] [HTTP] - GET /api/certificates 401
+[11:52:46] [HTTP] - GET /api/devices 401
+[11:52:52] [HTTP] - POST /api/auth/login 200
+[11:52:53] [HTTP] - GET /api/devices 200
+[11:52:53] [HTTP] - GET /api/devices 200
+[11:52:57] [HTTP] - GET /api/devices 200
+[11:52:57] [HTTP] - GET /api/certificates 200
+[11:53:30] [HTTP] - POST /api/ocpp/51dcf43b-9718-4ea4-a1e2-5ad1621e60da/contract-cert-group 200
+[11:54:39] [HTTP] - POST /api/ocpp/51dcf43b-9718-4ea4-a1e2-5ad1621e60da/contract-cert-group 200
+[11:55:42] [HTTP] - GET /SDK/webLanguage 404
+[12:02:03] [HTTP] - GET /api/ocpp/51dcf43b-9718-4ea4-a1e2-5ad1621e60da/contract-cert-group 404
+[12:03:43] [HTTP] - GET /api/devices 401
+[12:08:27] [HTTP] - CONNECT  404
+[12:37:44] [HTTP] - GET / 404
+[12:42:00] [HTTP] - GET /login.asp 404
+[12:46:45] [HTTP] - GET / 404
+[12:48:24] [HTTP] - GET / 404
+[12:48:26] [HTTP] - PRI * 404
+[12:48:34] [HTTP] - GET /wiki 404
+[13:26:16] [HTTP] - GET / 404
+[13:26:17] [HTTP] - PRI * 404
+[13:26:24] [HTTP] - GET /wiki 404

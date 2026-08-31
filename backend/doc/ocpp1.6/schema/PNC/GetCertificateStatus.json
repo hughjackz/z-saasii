@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GetCertificateStatusReq",
+  "type": "object",
+  "properties": {
+    "ocspRequestData": {
+      "type": "object",
+      "properties": {
+        "hashAlgorithm": { "type": "string", "enum": ["SHA256", "SHA384", "SHA512"] },
+        "issuerNameHash": { "type": "string", "maxLength": 128 },
+        "issuerKeyHash": { "type": "string", "maxLength": 128 },
+        "serialNumber": { "type": "string", "maxLength": 40 },
+        "responderURL": { "type": "string", "maxLength": 512 }
+      },
+      "required": ["hashAlgorithm", "issuerNameHash", "issuerKeyHash", "serialNumber", "responderURL"],
+      "description": "Required. Indicates the certificate of which the status is requested."
+    }
+  },
+  "required": ["ocspRequestData"],
+  "additionalProperties": false
+}

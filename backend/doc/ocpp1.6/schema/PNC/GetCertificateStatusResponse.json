@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GetCertificateStatusConf",
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["Accepted", "Failed"],
+      "description": "Required. Indicates whether the charging station was able to retrieve the OCSP certificate status."
+    },
+    "ocspResult": {
+      "type": "string",
+      "maxLength": 5500,
+      "description": "Optional. OCSPResponse class DER encoded, and then base64 encoded."
+    }
+  },
+  "required": ["status"],
+  "additionalProperties": false
+}

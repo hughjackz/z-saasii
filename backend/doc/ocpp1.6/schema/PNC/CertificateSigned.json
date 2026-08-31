@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CertificateSignedReq",
+  "type": "object",
+  "properties": {
+    "certificateChain": {
+      "type": "string",
+      "maxLength": 10000,
+      "description": "Required. The signed PEM encoded X.509 certificate."
+    }
+  },
+  "required": ["certificateChain"],
+  "additionalProperties": false
+}

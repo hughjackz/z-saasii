@@ -1,0 +1,19 @@
+[01:43:18] [HTTP] - GET /boaform/admin/formLogin 404
+[01:44:46] [HTTP] - GET / 404
+[01:44:46] [HTTP] - CONNECT  404
+[01:47:15] [HTTP] - CONNECT  404
+[01:49:11] [HTTP] - GET /images/js/eas/eas.js 404
+[02:31:29] [HTTP] - GET / 404
+[03:03:46] [HTTP] - GET / 404
+[04:53:11] [HTTP] - GET / 404
+[04:53:16] [HTTP] - CONNECT  404
+[05:24:19] [HTTP] - GET / 404
+[06:13:25] [HTTP] - GET / 404
+[06:57:06] [HTTP] - GET / 404
+[06:57:18] [HTTP] - POST /mcp 404
+[06:57:18] [HTTP] - GET /sse 404
+[06:57:18] [HTTP] - GET /favicon.ico 404
+[07:06:21] [HTTP] - GET /mcp 404
+[07:11:30] [HTTP] - GET / 404
+[07:24:35] [HTTP] - GET / 404
+[08:10:45] [HTTP] - GET / 404

@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s \"https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/tabler-icons.min.css\")",
+      "Bash(curl -sL \"https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/tabler-icons.min.css\" -o /tmp/tabler.css)",
+      "Read(//tmp/**)",
+      "Bash(curl -sL \"https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/dist/tabler-icons.min.css\" -o /tmp/tabler.css)",
+      "Bash(go build *)",
+      "Bash(go vet *)",
+      "Bash(npx vite *)",
+      "Bash(chmod +x /home/ubuntu/SAAS201-1/test/pki_generate_all.sh)",
+      "Bash(bash /home/ubuntu/SAAS201-1/test/pki_generate_all.sh)",
+      "Bash(chmod +x /home/ubuntu/SAAS201-1/test/pki_verify_all.sh)",
+      "Bash(bash /home/ubuntu/SAAS201-1/test/pki_verify_all.sh)"
+    ]
+  }
+}

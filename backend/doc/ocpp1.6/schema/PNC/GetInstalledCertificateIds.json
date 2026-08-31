@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GetInstalledCertificateIdsReq",
+  "type": "object",
+  "properties": {
+    "certificateType": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["V2GRootCertificate", "MORootCertificate", "V2GCertificateChain"]
+      },
+      "description": "Optional. Indicates the type of certificates requested. When omitted, all are requested."
+    }
+  },
+  "additionalProperties": false
+}

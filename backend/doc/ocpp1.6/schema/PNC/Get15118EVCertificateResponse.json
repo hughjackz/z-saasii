@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Get15118EVCertificateConf",
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["Accepted", "Failed"],
+      "description": "Required. Indicates whether the message was processed properly."
+    },
+    "exiResponse": {
+      "type": "string",
+      "maxLength": 5600,
+      "description": "Required. Raw CertificateInstallationRes response for the EV, Base64 encoded."
+    }
+  },
+  "required": ["status", "exiResponse"],
+  "additionalProperties": false
+}

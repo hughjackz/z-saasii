@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Get15118EVCertificateReq",
+  "type": "object",
+  "properties": {
+    "iso15118SchemaVersion": {
+      "type": "string",
+      "maxLength": 50,
+      "description": "Required. Schema version currently used for the 15118 session."
+    },
+    "action": {
+      "type": "string",
+      "enum": ["Install", "Update"],
+      "description": "Required. Defines whether certificate needs to be installed or updated."
+    },
+    "exiRequest": {
+      "type": "string",
+      "maxLength": 5600,
+      "description": "Required. Raw CertificateInstallationReq request from EV, Base64 encoded."
+    }
+  },
+  "required": ["iso15118SchemaVersion", "action", "exiRequest"],
+  "additionalProperties": false
+}

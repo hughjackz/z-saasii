@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SignCertificateConf",
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["Accepted", "Rejected"],
+      "description": "Required. Specifies whether the Central System can process the request."
+    }
+  },
+  "required": ["status"],
+  "additionalProperties": false
+}

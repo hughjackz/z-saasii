@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TriggerMessageConf",
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["Accepted", "Rejected", "NotImplemented"],
+      "description": "Required. Indicates whether the Charge Point will send the requested notification or not."
+    }
+  },
+  "required": ["status"],
+  "additionalProperties": false
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AuthorizeConf",
+  "type": "object",
+  "properties": {
+    "certificateStatus": {
+      "type": "string",
+      "enum": ["Accepted", "SignatureError", "CertificateExpired", "CertificateRevoked", "NoCertificateAvailable", "CertChainError", "ContractCancelled"],
+      "description": "Optional. Certificate status information."
+    },
+    "idTokenInfo": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["Accepted", "Blocked", "ConcurrentTx", "Expired", "Invalid"]
+        },
+        "cacheExpiryDateTime": { "type": "string", "format": "date-time" }
+      },
+      "required": ["status"],
+      "description": "Required. Contains information about authorization status, expiry etc."
+    }
+  },
+  "required": ["idTokenInfo"],
+  "additionalProperties": false
+}

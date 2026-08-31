@@ -1,0 +1,43 @@
+server:
+  port: "8080"
+  mode: "debug"
+
+database:
+  dsn: "root:GW-ocpp-888888@tcp(gz-cynosdbmysql-grp-6qgr83h3.sql.tencentcdb.com:27440)/db-saas-ocpp-dev?charset=utf8mb4&parseTime=True&loc=Local"
+
+jwt:
+  secret: "change-me-in-production-use-strong-random-key"
+  expireHours: 2
+
+ocpp:
+  wsAddr: ":9101"   # OCPP WebSocket server listen address
+
+vdv261:
+  enable: true               # Enable VDV261 HTTPS service
+  network_mode: "ipv4"       # ipv4 | ipv6 | dual
+  listen_addr: ":9443"       # HTTPS listen address for EVCC
+  url_path: "/vdv"           # VDV261 request path
+  cert_file: "resource/admin/cert/VDVserver.pem"
+  key_file:  "resource/admin/cert/VDVserver.key"
+  root_ca:   "resource/admin/cert/VDVroot.pem"
+
+certSigning:
+  default_days: 365
+  default_md: sha256
+
+  #v3_signing:
+  # 基本约束 (basicConstraints)
+  is_ca: true
+  # 密钥用途 (keyUsage)
+  key_usage:
+    - digitalSignature
+    - keyEncipherment
+    
+  # 扩展密钥用途 (extendedKeyUsage)
+  extended_key_usage:
+    - serverAuth
+    
+  # 授权信息访问 (authorityInfoAccess)
+  authority_info_access:
+    ca_issuers: "http://local.domain/cacert.pem"
+    ocsp: "http://local.domain/OCSP"

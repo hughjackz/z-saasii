@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GetInstalledCertificateIdsConf",
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["Accepted", "NotFound"],
+      "description": "Required. Charge Point indicates if it can process the request."
+    },
+    "certificateHashDataChain": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "certificateType": { "type": "string", "enum": ["V2GRootCertificate", "MORootCertificate", "V2GCertificateChain"] },
+          "certificateHashData": {
+            "type": "object",
+            "properties": {
+              "hashAlgorithm": { "type": "string", "enum": ["SHA256", "SHA384", "SHA512"] },
+              "issuerNameHash": { "type": "string", "maxLength": 128 },
+              "issuerKeyHash": { "type": "string", "maxLength": 128 },
+              "serialNumber": { "type": "string", "maxLength": 40 }
+            },
+            "required": ["hashAlgorithm", "issuerNameHash", "issuerKeyHash", "serialNumber"]
+          },
+          "childCertificateHashData": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "properties": {
+                "hashAlgorithm": { "type": "string", "enum": ["SHA256", "SHA384", "SHA512"] },
+                "issuerNameHash": { "type": "string", "maxLength": 128 },
+                "issuerKeyHash": { "type": "string", "maxLength": 128 },
+                "serialNumber": { "type": "string", "maxLength": 40 }
+              },
+              "required": ["hashAlgorithm", "issuerNameHash", "issuerKeyHash", "serialNumber"]
+            }
+          }
+        },
+        "required": ["certificateType", "certificateHashData"]
+      },
+      "description": "Optional. Certificate information for each available certificate."
+    }
+  },
+  "required": ["status"],
+  "additionalProperties": false
+}

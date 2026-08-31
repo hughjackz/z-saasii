@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VDV261.req",
+  "description": "VDV261 请求报文",
+  "type": "object",
+  "required": ["seq", "vin", "evccid", "odo", "bat_reqtime", "bat_eamount", "prec_eamount", "prec_reqtime", "chrg_stat", "data_num"],
+  "properties": {
+    "seq": {
+      "type": "integer",
+      "description": "序号"
+    },
+    "vin": {
+      "type": "string",
+      "description": "车辆VIN"
+    },
+    "evccid": {
+      "type": "string",
+      "description": "EVCCID"
+    },
+    "odo": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 21055406,
+      "description": "里程（km）"
+    },
+    "bat_reqtime": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 250,
+      "description": "高压电池预处理所需时间"
+    },
+    "bat_eamount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000,
+      "description": "高压电池充电所需能量"
+    },
+    "prec_eamount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000,
+      "description": "车辆预处理所需能量"
+    },
+    "prec_reqtime": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 250,
+      "description": "车辆预处理所需时间"
+    },
+    "chrg_stat": {
+      "type": "integer",
+      "enum": [0, 1, 2],
+      "description": "车辆充电状态。0: ready to charge, 1: charging, 2: charging impossible"
+    },
+    "data_num": {
+      "type": "string",
+      "description": "数据序号"
+    }
+  }
+}
