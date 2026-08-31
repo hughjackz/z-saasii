@@ -345,5 +345,14 @@
         6.3.4　应答消息：后台下发配置给EVCC。
             内容类型：json 应答参数如下 见backend/doc/VDV261/schema/VDV261resp.json
             后端通过EVCC上报过来的VIN信息，查询数据库中该VIN对应的VDVprofile，然后回复给EVCC
-            关于VDV的请求和回复也记录到log中    
- 
+            关于VDV的请求和回复也记录到log中 
+
+   
+##Note
+1. 启动脚本相关
+    ./run.sh          # 启动前后端（默认）
+    ./run.sh start    # 启动
+    ./run.sh stop     # 停止（优雅退出，后端走 graceful shutdown）
+    ./run.sh restart  # 重启
+
+2. 
