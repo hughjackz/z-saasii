@@ -8,6 +8,12 @@
       <span class="topbar-logo"><i class="ti ti-bolt"></i> CSMS</span>
       <div class="topbar-sep"></div>
       <span class="topbar-module">{{ currentRouteName }}</span>
+      <span v-if="devicesStore.current" class="topbar-device">
+        <i class="ti ti-charging-pile"></i>
+        {{ devicesStore.current.name }}
+        <span :class="['dot', devicesStore.current.online ? 'dot-green' : 'dot-gray']"></span>
+        <span class="topbar-device-protocol">{{ devicesStore.current.protocol }}</span>
+      </span>
       <div class="topbar-right">
         <span class="topbar-chip"><i class="ti ti-clock"></i> {{ clock }}</span>
         <div class="user-badge" @click="showUserMenu = !showUserMenu">
@@ -34,24 +40,30 @@
 
       <div v-if="hasAnyOcpp" class="nav-section">
         <div class="nav-label">OCPP</div>
-        <RouterLink v-if="auth.hasPermission('ocpp.configuration')" to="/ocpp/configuration" class="nav-item" active-class="active">
-          <i class="ti ti-settings"></i> Configuration
+        <!-- OCPP 2.x device selected: only the 2.0.1 console is offered -->
+        <RouterLink v-if="ocpp2Selected && auth.hasPermission('ocpp.configuration')" to="/ocpp/ocpp201" class="nav-item" active-class="active">
+          <i class="ti ti-terminal-2"></i> OCPP 2.0.1 Console
         </RouterLink>
-        <RouterLink v-if="auth.hasPermission('ocpp.transaction')" to="/ocpp/transactions" class="nav-item" active-class="active">
-          <i class="ti ti-receipt"></i> Transactions
-        </RouterLink>
-        <RouterLink v-if="auth.hasPermission('ocpp.action')" to="/ocpp/actions" class="nav-item" active-class="active">
-          <i class="ti ti-player-play"></i> Actions
-        </RouterLink>
-        <RouterLink v-if="auth.hasPermission('ocpp.maintenance')" to="/ocpp/maintenance" class="nav-item" active-class="active">
-          <i class="ti ti-tool"></i> Maintenance
-        </RouterLink>
-        <RouterLink v-if="auth.hasPermission('ocpp.pnc')" to="/ocpp/pnc" class="nav-item" active-class="active">
-          <i class="ti ti-certificate"></i> PnC
-        </RouterLink>
-        <RouterLink v-if="auth.hasPermission('ocpp.smartcharging')" to="/ocpp/smart-charging" class="nav-item" active-class="active">
-          <i class="ti ti-bolt"></i> Smart Charging
-        </RouterLink>
+        <template v-else>
+          <RouterLink v-if="auth.hasPermission('ocpp.configuration')" to="/ocpp/configuration" class="nav-item" active-class="active">
+            <i class="ti ti-settings"></i> Configuration
+          </RouterLink>
+          <RouterLink v-if="auth.hasPermission('ocpp.transaction')" to="/ocpp/transactions" class="nav-item" active-class="active">
+            <i class="ti ti-receipt"></i> Transactions
+          </RouterLink>
+          <RouterLink v-if="auth.hasPermission('ocpp.action')" to="/ocpp/actions" class="nav-item" active-class="active">
+            <i class="ti ti-player-play"></i> Actions
+          </RouterLink>
+          <RouterLink v-if="auth.hasPermission('ocpp.maintenance')" to="/ocpp/maintenance" class="nav-item" active-class="active">
+            <i class="ti ti-tool"></i> Maintenance
+          </RouterLink>
+          <RouterLink v-if="auth.hasPermission('ocpp.pnc')" to="/ocpp/pnc" class="nav-item" active-class="active">
+            <i class="ti ti-certificate"></i> PnC
+          </RouterLink>
+          <RouterLink v-if="auth.hasPermission('ocpp.smartcharging')" to="/ocpp/smart-charging" class="nav-item" active-class="active">
+            <i class="ti ti-bolt"></i> Smart Charging
+          </RouterLink>
+        </template>
       </div>
 
       <div v-if="auth.hasPermission('vdv261')" class="nav-section">
@@ -108,7 +120,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.js'
 import { useEventsStore } from '@/stores/events.js'
-import { useDevicesStore } from '@/stores/devices.js'
+import { useDevicesStore, isOcpp2 } from '@/stores/devices.js'
 import AppBadge from '@/components/AppBadge.vue'
 
 const auth = useAuthStore()
@@ -127,6 +139,9 @@ const roleColor = computed(() => ({ CS_Admin: 'red', CP_OP: 'amber', CP_OM: 'gre
 
 const ocppModules = ['ocpp.configuration','ocpp.transaction','ocpp.action','ocpp.maintenance','ocpp.pnc','ocpp.smartcharging']
 const hasAnyOcpp = computed(() => ocppModules.some(m => auth.hasPermission(m)))
+
+// OCPP section swaps by selected device protocol (README 2.3.1/2.3.2)
+const ocpp2Selected = computed(() => !!devicesStore.current && isOcpp2(devicesStore.current.protocol))
 
 function tick() {
   clock.value = new Date().toLocaleTimeString('en-GB')
@@ -166,6 +181,17 @@ onUnmounted(() => clearInterval(timer))
 .topbar-logo { font-size: 15px; font-weight: 600; color: var(--accent); display: flex; align-items: center; gap: 6px; }
 .topbar-sep { width: 0.5px; height: 18px; background: var(--border-md); }
 .topbar-module { font-size: 13px; font-weight: 500; color: var(--text1); }
+.topbar-device {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 500; color: var(--text2);
+  padding: 3px 10px; border-radius: 14px;
+  border: 0.5px solid var(--border-md); background: var(--bg);
+}
+.topbar-device i { font-size: 14px; color: var(--accent); }
+.topbar-device .dot { width: 6px; height: 6px; border-radius: 50%; }
+.topbar-device .dot-green { background: #1d9e75; }
+.topbar-device .dot-gray { background: #888; }
+.topbar-device-protocol { font-size: 10px; color: var(--text3); }
 .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
 .topbar-chip { font-size: 12px; color: var(--text2); display: flex; align-items: center; gap: 5px; }
 .topbar-chip i { font-size: 14px; }

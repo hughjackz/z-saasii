@@ -15,7 +15,8 @@ import (
 	"github.com/yourorg/csms-backend/internal/model"
 	"github.com/yourorg/csms-backend/internal/mylog"
 	"github.com/yourorg/csms-backend/internal/ocppws"
-	_ "github.com/yourorg/csms-backend/internal/ocppws/v16" // register V16Handler
+	_ "github.com/yourorg/csms-backend/internal/ocppws/v16"  // register V16Handler
+	_ "github.com/yourorg/csms-backend/internal/ocppws/v201" // register V201Handler
 	"github.com/yourorg/csms-backend/internal/repository"
 	"github.com/yourorg/csms-backend/internal/vdv261"
 	ws "github.com/yourorg/csms-backend/internal/websocket"

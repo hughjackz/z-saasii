@@ -22,11 +22,17 @@
     *中间为内容显示框图
 
     2.3.1 OVERVIEW
-        显示此用户全部的设备[前端请求，由后端告知]，及各个设备的状态，登录时间等信息
+        内容栏中构建顶部栏，如果是CS_Admin，需要有一个CP_OP筛选器，
+        显示出该CP_OP的所有devices[前端请求，由后端告知]，及各个device的状态，登录时间,OCPP版本号等信息
+        前端用户选择特性device后进入该设备的操作界面，根据OCPP协议版本号应该转至不同的操作页面，
     
-    2.3.2 OCPP 以下功能模块也由后端告知
-        内容栏中构建顶部栏，如果是CS_Admin，需要有一个CP_OP选择栏，和device选择栏，如果是CP_OP或CP_OM登录时，仅需要一个device选择栏，
+    2.3.2 OCPP  
+
+        CP_OP和device应为全局数据,由用户在overview中选定
+        以下功能模块开放权限也由后端告知，前端根据开放权限进行展示
+
         在下述的功能模块中，有的需要向后端的发送请求，此时将CP_OP和device作为参数传送进去，以便后端能够明确知道待操作的设备
+        需要显示当前桩的
         
         2.3.2.1 configuration
             有近100个配置数据的显示，这些key和value来自后端
@@ -36,7 +42,7 @@
             后续操作，支持单个的读取配置和修改数据，也支持部分配置的读取和设置
 
         2.3.2.2 transaction
-            2.3.2.1 bill
+            2.3.2.2.1 bill
                 显示过往的订单
                 显示当前正在运行的订单
                 订单中的数据有
@@ -49,7 +55,7 @@
                     启动电能 startmeter
                     结束电能 stopmeter
                     消费电能 costenergy
-            2.3.2.2 action
+            2.3.2.2.2 action
                 remote start，需要填入设备的连接号，启动button
                 remote stop， 需要填入设备的连接号和交易id，停止button
 
@@ -97,6 +103,7 @@
             a) 支持上传和下载VDVroot证书、VDVserver证书、VDVserver私钥，文件分别为resource/admin/cert/VDVroot.pem、resource/admin/cert/VDVserver.pem、resource/admin/cert/VDVserver.key
             b) 可以选择IPV4、IPV6、IPV4&IPV6dual三种模式
             c) 支持重启后端的VDV261服务
+
     2.3.4 Mangement
         2.3.4.1 users
             能够实现用户的增删改查，
@@ -190,8 +197,6 @@
         4.针对前端请求查看日志的数据进行响应
 
 
-
-
 4. ocpp后端功能
     现在要完善ocpp后端的部分，使用gorilla/websocket和device进行通讯
     分为三个websocket协议，分别为ocpp1.6、ocpp2.0.1、ocpp2.1
@@ -201,6 +206,10 @@
     4.1 db.device相关数据说明
         db.device.enabled 代表平台是否同意此桩接入到后端，在4.3.1中使用 0-rejected 1-accepted
         db.device.status 代表了桩的当前的状态（前提是已经同意注册）
+
+        后端与device的通讯超时时间为2*heartbeatinterval，超时后将状态置为离线，未建立链接时也应该置为离线状态。
+        建立链接之后，应从数据库中检索device状态发送至前端，数据库中的状态为device上报。
+
 
     4.2 OCPP1.6相关功能描述
         相关接口应该和主流程独立package出来，为了后面实现和OCPP2.0.1、OCPP2.1的多版本兼容处理
@@ -264,6 +273,34 @@
                     saas<---Authorize.req----device
                     saas----Authorize.conf--->device
 
+    4.3 OCPP2.0.1相关功能描述
+        schema在"backend/doc/ocpp2.0.1/schema/"
+        protocol文件在"backend/doc/ocpp2.0.1/protocol/specification"
+        1.Authorize
+            
+        2.BootNotification
+
+        3.Heartbeat
+
+        4.StatusNotification
+
+        5.TransactionEvent
+
+        6.NotifyReport
+
+        7.NotifyEvent
+
+        8.CertificateSigned
+
+        9.DeleteCertificate
+
+        10.Get15118EVCertificate
+
+        11.GetInstalledCertificateIds
+
+        12.InstallCertificate
+
+        13.SignCertificate
 
 
 5. 数据库结构

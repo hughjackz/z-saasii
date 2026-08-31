@@ -20,6 +20,9 @@ import (
 // a circular import between ocppws and v16.
 var V16Handler func(dc *DeviceConnection, call *CallMessage, eventCh chan<- *model.Event)
 
+// V201Handler is set by the v201 package, mirroring V16Handler.
+var V201Handler func(dc *DeviceConnection, call *CallMessage, eventCh chan<- *model.Event)
+
 var upgrader = websocket.Upgrader{
 	CheckOrigin:     func(r *http.Request) bool { return true },
 	ReadBufferSize:  40960,
@@ -75,12 +78,48 @@ func (s *Server) Start() {
 		}
 	})
 
+	go s.monitorLoop()
+
 	go func() {
 		log.Printf("[ocppws] listening on %s", s.addr)
 		if err := http.ListenAndServe(s.addr, handler); err != nil {
 			log.Fatalf("[ocppws] fatal: %v", err)
 		}
 	}()
+}
+
+// monitorLoop periodically checks connected devices and drops connections
+// that have been silent longer than 2×heartbeat_interval (README 4.1).
+func (s *Server) monitorLoop() {
+	const monitorInterval = 10 * time.Second
+	t := time.NewTicker(monitorInterval)
+	defer t.Stop()
+	for range t.C {
+		for _, id := range s.hub.ConnectedDevices() {
+			dc := s.hub.Get(id)
+			if dc == nil {
+				continue
+			}
+			timeout := time.Duration(dc.HeartbeatInterval) * 2 * time.Second
+			if time.Since(dc.LastSeenAt()) > timeout {
+				log.Printf("[ocppws] heartbeat timeout for %s (silent %v > %v)", dc.DeviceName, time.Since(dc.LastSeenAt()), timeout)
+				s.hub.Unregister(dc) // closes Conn+WriteCh, removes from map
+				_ = repository.UpdateDeviceStatus(dc.DeviceName, "Offline")
+				s.emitEvent("error", dc.TenantID, dc.DeviceName, "Heartbeat timeout — device marked offline")
+			}
+		}
+	}
+}
+
+// disconnect tears down a connection that is no longer live and, if it was
+// still the registered connection, marks the device offline in the DB.
+// A stale connection (superseded by a re-register) is ignored.
+func (s *Server) disconnect(dc *DeviceConnection) {
+	if !s.hub.Unregister(dc) {
+		return
+	}
+	_ = repository.UpdateDeviceStatus(dc.DeviceName, "Offline")
+	s.emitEvent("warning", dc.TenantID, dc.DeviceName, "Device disconnected — marked offline")
 }
 
 // cleanPath returns the canonical path, collapsing // and removing . and .. elements.
@@ -106,7 +145,7 @@ func (s *Server) handleV16(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleV201(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "OCPP 2.0.1 not yet supported", http.StatusNotImplemented)
+	s.handleConnection(w, r, "201")
 }
 
 func (s *Server) handleV21(w http.ResponseWriter, r *http.Request) {
@@ -155,25 +194,34 @@ func (s *Server) handleConnection(w http.ResponseWriter, r *http.Request, ocppVe
 		return
 	}
 
-	dc := &DeviceConnection{
-		DeviceID:   device.ID,
-		DeviceName: device.Name,
-		TenantID:   device.TenantID,
-		CPOPName:   cpopName,
-		Version:    ocppVersion,
-		Conn:       conn,
-		WriteCh:    make(chan []byte, 256),
+	hbInterval := device.HeartbeatInterval
+	if hbInterval <= 0 {
+		hbInterval = 60
 	}
 
+	dc := &DeviceConnection{
+		DeviceID:          device.ID,
+		DeviceName:        device.Name,
+		TenantID:          device.TenantID,
+		CPOPName:          cpopName,
+		Version:           ocppVersion,
+		Conn:              conn,
+		WriteCh:           make(chan []byte, 256),
+		HeartbeatInterval: hbInterval,
+	}
+	dc.Touch()
+
 	s.hub.Register(dc)
+
+	// Push the device-reported status from the DB to the frontend (README 4.1).
+	s.emitEvent("info", dc.TenantID, dc.DeviceName, "Device connected (status="+device.Status+")")
+
 	go s.writePump(dc)
 	go s.readPump(dc)
 }
 
 func (s *Server) writePump(dc *DeviceConnection) {
-	defer func() {
-		s.hub.Unregister(dc.DeviceID)
-	}()
+	defer s.disconnect(dc)
 	for msg := range dc.WriteCh {
 		log.Printf("[ocppws] >> %s %s", dc.DeviceName, truncate(msg, 500))
 		mylog.Device(dc.DeviceName, ">>", string(msg))
@@ -185,9 +233,7 @@ func (s *Server) writePump(dc *DeviceConnection) {
 }
 
 func (s *Server) readPump(dc *DeviceConnection) {
-	defer func() {
-		s.hub.Unregister(dc.DeviceID)
-	}()
+	defer s.disconnect(dc)
 	for {
 		_, msg, err := dc.Conn.ReadMessage()
 		if err == nil {
@@ -208,9 +254,12 @@ func (s *Server) readPump(dc *DeviceConnection) {
 				log.Printf("[ocppws] parse error from %s: %v (raw: %s)", dc.DeviceName, err, string(msg[:min(len(msg), 200)]))
 				continue
 			}
+			dc.Touch()
 			s.dispatchCall(dc, call)
 			continue
 		}
+
+		dc.Touch()
 
 		s.mu.Lock()
 		ch, ok := s.pending[msgID]
@@ -232,6 +281,10 @@ func (s *Server) dispatchCall(dc *DeviceConnection, call *CallMessage) {
 	case "16":
 		if V16Handler != nil {
 			V16Handler(dc, call, s.eventCh)
+		}
+	case "201":
+		if V201Handler != nil {
+			V201Handler(dc, call, s.eventCh)
 		}
 	default:
 		s.sendError(dc, call.MsgID, "NotSupported", "protocol version not supported")
@@ -296,14 +349,18 @@ func (s *Server) sendError(dc *DeviceConnection, msgID, code, desc string) {
 	dc.WriteCh <- errMsg
 }
 
-func (s *Server) pushEvent(level, device, message string) {
-	select {
-	case s.eventCh <- &model.Event{
+// emitEvent persists an event to the event log and fans it out to frontend
+// WebSocket clients (non-blocking).
+func (s *Server) emitEvent(level, tenantID, device, message string) {
+	ev := &model.Event{
 		Time:    time.Now().UTC().Format(time.RFC3339),
 		Level:   level,
 		Device:  device,
 		Message: message,
-	}:
+	}
+	repository.SaveEvent(ev, tenantID)
+	select {
+	case s.eventCh <- ev:
 	default:
 	}
 }

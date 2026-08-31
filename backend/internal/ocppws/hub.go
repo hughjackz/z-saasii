@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -17,6 +18,25 @@ type DeviceConnection struct {
 	Version    string // "16", "201", "21"
 	Conn       *websocket.Conn
 	WriteCh    chan []byte
+
+	HeartbeatInterval int // seconds; from device record at connect time (fallback 60)
+
+	lastSeenMu sync.Mutex
+	lastSeen   time.Time // updated on ANY inbound frame (readPump)
+}
+
+// Touch records that an inbound frame was just received from the device.
+func (dc *DeviceConnection) Touch() {
+	dc.lastSeenMu.Lock()
+	dc.lastSeen = time.Now()
+	dc.lastSeenMu.Unlock()
+}
+
+// LastSeenAt returns when the last inbound frame was received.
+func (dc *DeviceConnection) LastSeenAt() time.Time {
+	dc.lastSeenMu.Lock()
+	defer dc.lastSeenMu.Unlock()
+	return dc.lastSeen
 }
 
 // DeviceHub manages all connected charge points.
@@ -45,17 +65,21 @@ func (h *DeviceHub) Register(conn *DeviceConnection) {
 	log.Printf("[ocppws] device %s registered (id=%s, version=%s)", conn.DeviceName, conn.DeviceID, conn.Version)
 }
 
-// Unregister removes a device from the hub. Connection state is managed
-// purely in-memory; the device's operational status in the DB is unchanged.
-func (h *DeviceHub) Unregister(deviceID string) {
+// Unregister removes a device connection from the hub.
+// Returns true only if the given connection was still the registered one;
+// a stale connection (superseded by a re-register) is a no-op returning false.
+// Callers use the return value to decide whether to mark the device offline.
+func (h *DeviceHub) Unregister(conn *DeviceConnection) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if conn, ok := h.devices[deviceID]; ok {
+	if cur, ok := h.devices[conn.DeviceID]; ok && cur == conn {
 		close(conn.WriteCh)
 		conn.Conn.Close()
-		delete(h.devices, deviceID)
-		log.Printf("[ocppws] device %s unregistered (offline)", deviceID)
+		delete(h.devices, conn.DeviceID)
+		log.Printf("[ocppws] device %s unregistered (offline)", conn.DeviceID)
+		return true
 	}
+	return false
 }
 
 // Get returns the connection for a device, or nil if not connected.

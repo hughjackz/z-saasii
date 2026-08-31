@@ -120,11 +120,11 @@ export const idtags = {
 
 // VDV261
 export const vdv = {
-  listProfiles: () => http.get('/vdv/profiles'),
+  listProfiles: (params) => http.get('/vdv/profiles', { params }),
   createProfile: (data) => http.post('/vdv/profiles', data),
   updateProfile: (id, data) => http.put(`/vdv/profiles/${id}`, data),
   deleteProfile: (id) => http.delete(`/vdv/profiles/${id}`),
-  listCarInfos: () => http.get('/vdv/carinfos'),
+  listCarInfos: (params) => http.get('/vdv/carinfos', { params }),
   createCarInfo: (data) => http.post('/vdv/carinfos', data),
   updateCarInfo: (id, data) => http.put(`/vdv/carinfos/${id}`, data),
   deleteCarInfo: (id) => http.delete(`/vdv/carinfos/${id}`),

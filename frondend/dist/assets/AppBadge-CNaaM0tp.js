@@ -1,1 +1,0 @@
-import{_ as o}from"./_plugin-vue_export-helper-DlAUqK2U.js";import{w as r,g as s,B as t,r as p}from"./index-dni9EJ_4.js";const c={__name:"AppBadge",props:{color:{type:String,default:"gray"}},setup(e){return(a,n)=>(r(),s("span",{class:p(["badge",`badge-${e.color}`])},[t(a.$slots,"default",{},void 0)],2))}},_=o(c,[["__scopeId","data-v-2e3ffc07"]]);export{_ as A};

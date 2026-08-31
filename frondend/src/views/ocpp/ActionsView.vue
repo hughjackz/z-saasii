@@ -1,8 +1,7 @@
 <template>
   <div>
     <PageHeader title="Remote Actions" subtitle="Start and stop charging sessions remotely" />
-    <TenantSelector v-if="auth.isCSAdmin" v-model="selectedTenant" @change="onTenantChange" />
-    <DeviceSelector v-model="selectedDevice" :devices="auth.isCSAdmin ? tenantDevices : null" />
+    <DeviceBanner :device="device" />
 
     <div class="actions-grid">
       <!-- Remote Start -->
@@ -45,18 +44,14 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { transactions, profiles as profilesApi, devices as devicesApi } from '@/api/index.js'
-import { useAuthStore } from '@/stores/auth.js'
-import DeviceSelector from '@/components/DeviceSelector.vue'
+import { transactions, profiles as profilesApi } from '@/api/index.js'
+import { useGlobalDevice } from '@/composables/useGlobalDevice.js'
 import PageHeader from '@/components/PageHeader.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppButton from '@/components/AppButton.vue'
-import TenantSelector from '@/components/TenantSelector.vue'
+import DeviceBanner from '@/components/DeviceBanner.vue'
 
-const auth = useAuthStore()
-const selectedTenant = ref('')
-const tenantDevices = ref([])
-const selectedDevice = ref(null)
+const { device, deviceId } = useGlobalDevice()
 const profiles = ref([])
 const startForm = ref({ connectorId: 1, idTag: '', profileId: '' })
 const stopForm = ref({ transactionId: null })
@@ -65,19 +60,11 @@ const stopLoading = ref(false)
 const startResult = ref(null)
 const stopResult = ref(null)
 
-async function fetchDevices() {
-  try {
-    const tid = auth.isCSAdmin && selectedTenant.value ? selectedTenant.value : undefined
-    tenantDevices.value = await devicesApi.list(tid ? { tenant_id: tid } : undefined)
-  } catch { tenantDevices.value = [] }
-}
-function onTenantChange() { selectedDevice.value = null; fetchDevices() }
-
 async function doStart() {
-  if (!selectedDevice.value) return
+  if (!deviceId.value) return
   startLoading.value = true; startResult.value = null
   try {
-    const res = await transactions.remoteStart(selectedDevice.value, startForm.value)
+    const res = await transactions.remoteStart(deviceId.value, startForm.value)
     startResult.value = { ok: res.status === 'Accepted', message: `Status: ${res.status}` }
   } catch (e) {
     startResult.value = { ok: false, message: e?.message || 'Error' }
@@ -85,10 +72,10 @@ async function doStart() {
 }
 
 async function doStop() {
-  if (!selectedDevice.value || !stopForm.value.transactionId) return
+  if (!deviceId.value || !stopForm.value.transactionId) return
   stopLoading.value = true; stopResult.value = null
   try {
-    const res = await transactions.remoteStop(selectedDevice.value, stopForm.value)
+    const res = await transactions.remoteStop(deviceId.value, stopForm.value)
     stopResult.value = { ok: res.status === 'Accepted', message: `Status: ${res.status}` }
   } catch (e) {
     stopResult.value = { ok: false, message: e?.message || 'Error' }
@@ -97,7 +84,6 @@ async function doStop() {
 
 onMounted(async () => {
   await Promise.all([
-    fetchDevices(),
     profilesApi.list().then(r => profiles.value = r).catch(() => {})
   ])
 })

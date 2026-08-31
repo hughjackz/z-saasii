@@ -1,8 +1,7 @@
 <template>
   <div>
     <PageHeader title="Plug &amp; Charge (PnC)" subtitle="15118 PnC certificate management" />
-    <TenantSelector v-if="auth.isCSAdmin" v-model="selectedTenant" @change="onTenantChange" />
-    <DeviceSelector v-model="selectedDevice" :devices="auth.isCSAdmin ? tenantDevices : null" />
+    <DeviceBanner :device="device" />
 
     <div class="pnc-grid">
       <!-- 1. Install SECC Leaf Certificate -->
@@ -93,7 +92,7 @@
       </AppCard>
 
       <!-- 5. Contract Certificate Group (2.3.2.4.e) -->
-      <AppCard v-if="selectedDevice" title="5. Contract Certificate Group" class="span-2">
+      <AppCard v-if="device" title="5. Contract Certificate Group" class="span-2">
         <p class="pnc-desc">Select one certificate from each type to form the contract certificate group (used by ContractGenerate / 4.2.9.5).</p>
         <div class="contract-grid">
           <div v-for="t in contractCertTypes" :key="t" class="contract-row">
@@ -117,18 +116,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { pnc, certs as certsApi, devices as devicesApi } from '@/api/index.js'
-import { useAuthStore } from '@/stores/auth.js'
-import DeviceSelector from '@/components/DeviceSelector.vue'
+import { pnc, certs as certsApi } from '@/api/index.js'
+import { useGlobalDevice } from '@/composables/useGlobalDevice.js'
 import PageHeader from '@/components/PageHeader.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppButton from '@/components/AppButton.vue'
-import TenantSelector from '@/components/TenantSelector.vue'
+import DeviceBanner from '@/components/DeviceBanner.vue'
 
-const auth = useAuthStore()
-const selectedTenant = ref('')
-const tenantDevices = ref([])
-const selectedDevice = ref(null)
+const { device, deviceId } = useGlobalDevice()
 const libraryCerts = ref([])
 
 // All 13 uploadable types (exclude SECC-leaf-cert, which is auto-generated)
@@ -164,19 +159,11 @@ function onContractCertChange(type, name) {
   // The certs are already in libraryCerts, just filter by type
 }
 
-async function fetchDevices() {
-  try {
-    const tid = auth.isCSAdmin && selectedTenant.value ? selectedTenant.value : undefined
-    tenantDevices.value = await devicesApi.list(tid ? { tenant_id: tid } : undefined)
-  } catch { tenantDevices.value = [] }
-}
-function onTenantChange() { selectedDevice.value = null; fetchDevices() }
-
 // 1. Install SECC Leaf
 async function doInstallSeccLeaf() {
   seccLoading.value = true; seccResult.value = null
   try {
-    await pnc.signCertificate(selectedDevice.value, { ...seccForm.value })
+    await pnc.signCertificate(deviceId.value, { ...seccForm.value })
     seccResult.value = { ok: true, message: 'SECC Leaf signing triggered. Device will request certificate.' }
   } catch (e) { seccResult.value = { ok: false, message: e?.message || 'Error' } }
   finally { seccLoading.value = false }
@@ -186,7 +173,7 @@ async function doInstallSeccLeaf() {
 async function doInstall() {
   installLoading.value = true; installResult.value = null
   try {
-    const res = await pnc.installCert(selectedDevice.value, [...installSelected.value], installCertType.value)
+    const res = await pnc.installCert(deviceId.value, [...installSelected.value], installCertType.value)
     const sent = res.results?.filter(r => r.status === 'Sent').length || installSelected.value.length
     installResult.value = { ok: true, message: `${sent} certificate(s) sent one-by-one.` }
     installSelected.value = []
@@ -196,9 +183,9 @@ async function doInstall() {
 
 // 3. Get Installed Certificates
 async function doGetCerts() {
-  if (!selectedDevice.value) return; getLoading.value = true
+  if (!deviceId.value) return; getLoading.value = true
   try {
-    const res = await pnc.getInstalledCerts(selectedDevice.value, getCertType.value || undefined)
+    const res = await pnc.getInstalledCerts(deviceId.value, getCertType.value || undefined)
     installedCerts.value = res?.certificateHashDataChain || (Array.isArray(res) ? res : [])
   }
   finally { getLoading.value = false }
@@ -209,7 +196,7 @@ async function doDelete() {
   delLoading.value = true; delResult.value = null
   try {
     for (const name of delSelected.value) {
-      await pnc.deleteCert(selectedDevice.value, name)
+      await pnc.deleteCert(deviceId.value, name)
     }
     delResult.value = { ok: true, message: `${delSelected.value.length} certificate(s) deleted.` }
     delSelected.value = []
@@ -221,14 +208,14 @@ async function doDelete() {
 async function doSaveContractGroup() {
   contractLoading.value = true; contractResult.value = null
   try {
-    await pnc.contractCertGroup(selectedDevice.value, { ...contractGroup.value })
+    await pnc.contractCertGroup(deviceId.value, { ...contractGroup.value })
     contractResult.value = { ok: true, message: 'Contract certificate group saved.' }
   } catch (e) { contractResult.value = { ok: false, message: e?.error || 'Save failed' } }
   finally { contractLoading.value = false }
 }
 
 onMounted(async () => {
-  await Promise.all([fetchDevices(), certsApi.list().then(r => libraryCerts.value = r).catch(() => {})])
+  await Promise.all([certsApi.list().then(r => libraryCerts.value = r).catch(() => {})])
 })
 </script>
 

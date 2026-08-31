@@ -6,7 +6,11 @@
       </template>
     </PageHeader>
 
-    <TenantSelector v-if="auth.isCSAdmin" v-model="selectedTenant" @change="onTenantChange" />
+    <TenantSelector
+      v-if="auth.isCSAdmin"
+      :model-value="devicesStore.cpOp?.tenantId || ''"
+      @change="onTenantChange"
+    />
 
     <!-- Stats row -->
     <div class="stats-grid">
@@ -32,12 +36,16 @@
     <div v-if="loading" class="loading">
       <i class="ti ti-loader-2 spin"></i> Loading devices…
     </div>
+    <div v-else-if="!deviceList.length" class="empty">
+      No devices found. Select a CP_OP above (CS_Admin) or add devices under Management → Devices.
+    </div>
     <div v-else class="device-grid">
       <div
         v-for="d in deviceList"
         :key="d.id"
         class="dev-card"
-        @click="$router.push('/ocpp/configuration')"
+        :class="{ selected: devicesStore.current?.id === d.id }"
+        @click="openDevice(d)"
       >
         <div class="dev-card-top">
           <span class="dev-name">{{ d.name }}</span>
@@ -50,7 +58,7 @@
         <div class="dev-meta">
           <div class="dev-meta-item">Connectors<br><strong>{{ d.connectors ?? '—' }}</strong></div>
           <div class="dev-meta-item">Active TX<br><strong :style="d.activeTx ? 'color:#1d9e75' : ''">{{ d.activeTx ?? 0 }}</strong></div>
-          <div class="dev-meta-item">Heartbeat<br><strong>{{ d.lastHeartbeat ? dayjs(d.lastHeartbeat).fromNow() : '—' }}</strong></div>
+          <div class="dev-meta-item">Last seen<br><strong>{{ d.lastHeartbeat ? dayjs(d.lastHeartbeat).fromNow() : '—' }}</strong></div>
           <div class="dev-meta-item">Owner<br><strong>{{ d.ownerName ?? '—' }}</strong></div>
         </div>
       </div>
@@ -59,11 +67,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { devices as devicesApi } from '@/api/index.js'
 import { useAuthStore } from '@/stores/auth.js'
+import { useDevicesStore, isOcpp2 } from '@/stores/devices.js'
+import { useEventsStore } from '@/stores/events.js'
 import PageHeader from '@/components/PageHeader.vue'
 import AppBadge from '@/components/AppBadge.vue'
 import AppButton from '@/components/AppButton.vue'
@@ -71,7 +82,9 @@ import TenantSelector from '@/components/TenantSelector.vue'
 
 dayjs.extend(relativeTime)
 const auth = useAuthStore()
-const selectedTenant = ref('')
+const devicesStore = useDevicesStore()
+const eventsStore = useEventsStore()
+const router = useRouter()
 const deviceList = ref([])
 const loading = ref(false)
 
@@ -79,16 +92,41 @@ const onlineCount = computed(() => deviceList.value.filter(d => d.online).length
 const activeCount = computed(() => deviceList.value.reduce((s, d) => s + (d.activeTx || 0), 0))
 const faultedCount = computed(() => deviceList.value.filter(d => d.status === 'Faulted').length)
 
-
 async function fetchDevices() {
   loading.value = true
   try {
-    const tid = auth.isCSAdmin && selectedTenant.value ? selectedTenant.value : undefined
+    const tid = auth.isCSAdmin && devicesStore.cpOp?.tenantId ? devicesStore.cpOp.tenantId : undefined
     deviceList.value = await devicesApi.list(tid ? { tenant_id: tid } : undefined)
   } catch { deviceList.value = [] }
   finally { loading.value = false }
 }
-function onTenantChange() { fetchDevices() }
+
+function onTenantChange(payload) {
+  devicesStore.setCpOp(payload?.tenantId ? payload : null)
+  // A previously selected device from another tenant no longer applies
+  if (devicesStore.current && (!payload?.tenantId || devicesStore.current.tenantId !== payload.tenantId)) {
+    devicesStore.select(null)
+  }
+  fetchDevices()
+}
+
+// Enter the device's operation interface, routed by OCPP protocol version
+// (README 2.3.1).
+function openDevice(d) {
+  devicesStore.select(d.id)
+  router.push(isOcpp2(d.protocol) ? '/ocpp/ocpp201' : '/ocpp/configuration')
+}
+
+// Lightweight auto-refresh when device-related events arrive on the WS hub.
+let refreshTimer
+watch(() => eventsStore.logs.length, () => {
+  if (refreshTimer) return
+  refreshTimer = setTimeout(() => {
+    refreshTimer = null
+    fetchDevices()
+  }, 2000)
+})
+
 onMounted(fetchDevices)
 </script>
 
@@ -103,6 +141,7 @@ onMounted(fetchDevices)
   border-radius: var(--radius-lg); padding: 14px 16px; cursor: pointer; transition: all 0.15s;
 }
 .dev-card:hover { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
+.dev-card.selected { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
 .dev-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
 .dev-name { font-weight: 500; font-size: 14px; }
 .dev-protocol { font-size: 11px; color: var(--text2); margin-bottom: 12px; }
@@ -110,6 +149,7 @@ onMounted(fetchDevices)
 .dev-meta-item { font-size: 11px; color: var(--text2); line-height: 1.6; }
 .dev-meta-item strong { color: var(--text1); font-weight: 500; display: block; }
 .loading { display: flex; align-items: center; gap: 8px; color: var(--text2); padding: 40px 0; justify-content: center; }
+.empty { color: var(--text2); padding: 40px 0; text-align: center; font-size: 13px; }
 .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
 .dot-green { background: #1d9e75; }
 .dot-amber { background: #ef9f27; }

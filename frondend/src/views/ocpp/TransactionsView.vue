@@ -1,8 +1,7 @@
 <template>
   <div>
     <PageHeader title="Transactions" subtitle="Active and historical charging sessions" />
-    <TenantSelector v-if="auth.isCSAdmin" v-model="selectedTenant" @change="onTenantChange" />
-    <DeviceSelector v-model="selectedDevice" :devices="auth.isCSAdmin ? tenantDevices : null" />
+    <DeviceBanner :device="device" />
 
     <!-- Active -->
     <AppCard style="margin-bottom:14px;padding:0;overflow:hidden">
@@ -67,20 +66,16 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import dayjs from 'dayjs'
-import { transactions, devices as devicesApi } from '@/api/index.js'
-import { useAuthStore } from '@/stores/auth.js'
-import DeviceSelector from '@/components/DeviceSelector.vue'
+import { transactions } from '@/api/index.js'
+import { useGlobalDevice } from '@/composables/useGlobalDevice.js'
 import PageHeader from '@/components/PageHeader.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppBadge from '@/components/AppBadge.vue'
-import TenantSelector from '@/components/TenantSelector.vue'
+import DeviceBanner from '@/components/DeviceBanner.vue'
 
-const auth = useAuthStore()
-const selectedTenant = ref('')
-const tenantDevices = ref([])
-const selectedDevice = ref(null)
+const { device, deviceId } = useGlobalDevice()
 const active = ref([])
 const history = ref([])
 const loading = ref(false)
@@ -109,17 +104,8 @@ async function load(device) {
   } finally { loading.value = false }
 }
 
-async function fetchDevices() {
-  try {
-    const tid = auth.isCSAdmin && selectedTenant.value ? selectedTenant.value : undefined
-    tenantDevices.value = await devicesApi.list(tid ? { tenant_id: tid } : undefined)
-  } catch { tenantDevices.value = [] }
-}
-function onTenantChange() { selectedDevice.value = null; fetchDevices() }
-onMounted(fetchDevices)
-
-watch(selectedDevice, d => load(d))
-watch([txPage, txSearch], () => load(selectedDevice.value))
+watch(deviceId, d => load(d), { immediate: true })
+watch([txPage, txSearch], () => load(deviceId.value))
 </script>
 
 <style scoped>

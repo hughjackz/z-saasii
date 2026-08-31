@@ -87,6 +87,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { devices as devicesApi, users as usersApi } from '@/api/index.js'
 import { useAuthStore } from '@/stores/auth.js'
+import { useDevicesStore } from '@/stores/devices.js'
 import PageHeader from '@/components/PageHeader.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppBadge from '@/components/AppBadge.vue'
@@ -95,6 +96,7 @@ import ConfirmModal from '@/components/ConfirmModal.vue'
 import TenantSelector from '@/components/TenantSelector.vue'
 
 const auth = useAuthStore()
+const devicesStore = useDevicesStore()
 const list = ref([])
 const cpOps = ref([])
 const loading = ref(false)
@@ -144,7 +146,11 @@ async function save() {
 
 async function doDelete() {
   deleting.value = true
-  try { await devicesApi.remove(delTarget.value.id); showConfirm.value = false; await load() } finally { deleting.value = false }
+  try {
+    await devicesApi.remove(delTarget.value.id); showConfirm.value = false; await load()
+    // Reconcile the global selection: a deleted device must not stay selected
+    await devicesStore.fetchAll()
+  } finally { deleting.value = false }
 }
 
 onMounted(async () => {

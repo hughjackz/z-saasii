@@ -2,6 +2,9 @@
   <div>
     <PageHeader title="VDV 261" subtitle="VDV profiles, car management and settings" />
 
+    <!-- CP_OP filter for CS_Admin (README 2.3.3) -->
+    <TenantSelector v-if="auth.isCSAdmin" v-model="selectedTenant" @change="onTenantChange" />
+
     <div class="tabs">
       <button :class="['tab', {active: tab==='profiles'}]" @click="tab='profiles'">VDV Profiles</button>
       <button :class="['tab', {active: tab==='cars'}]" @click="tab='cars'">Car Management</button>
@@ -170,10 +173,12 @@ import PageHeader from '@/components/PageHeader.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppModal from '@/components/AppModal.vue'
 import ConfirmModal from '@/components/ConfirmModal.vue'
+import TenantSelector from '@/components/TenantSelector.vue'
 
 const auth = useAuthStore()
 const tab = ref('profiles')
 const cpOps = ref([])
+const selectedTenant = ref('')
 
 // Profiles
 const profiles = ref([]);  const pLoading = ref(false)
@@ -203,7 +208,13 @@ function applySettings(s) {
 }
 
 // ─── Profiles ────────────────────────────────────────────────────────────────
-async function loadProfiles() { pLoading.value = true; try { profiles.value = await vdv.listProfiles() } finally { pLoading.value = false } }
+function vdvParams() { return auth.isCSAdmin && selectedTenant.value ? { tenant_id: selectedTenant.value } : undefined }
+function onTenantChange() {
+  // Reload whichever list is visible
+  if (tab.value === 'profiles') loadProfiles()
+  else if (tab.value === 'cars') loadCars()
+}
+async function loadProfiles() { pLoading.value = true; try { profiles.value = await vdv.listProfiles(vdvParams()) } finally { pLoading.value = false } }
 function openProfile(p) {
   pEdit.value = p || null
   pForm.value = p ? { ...p } : { name: '', driveoff: '00:00', precDsrd: 0, precHvac: 0, ambientTemp: 22, tenantId: '' }
@@ -221,7 +232,7 @@ function delProfile(p) { pDelTarget.value = p; pDelShow.value = true }
 async function doDeleteProfile() { pDeleting.value = true; try { await vdv.deleteProfile(pDelTarget.value.id); pDelShow.value = false; await loadProfiles() } finally { pDeleting.value = false } }
 
 // ─── Cars ────────────────────────────────────────────────────────────────────
-async function loadCars() { cLoading.value = true; try { cars.value = await vdv.listCarInfos() } finally { cLoading.value = false } }
+async function loadCars() { cLoading.value = true; try { cars.value = await vdv.listCarInfos(vdvParams()) } finally { cLoading.value = false } }
 function openCar(c) {
   cEdit.value = c || null
   cForm.value = c ? { ...c, password: '' } : { vin: '', password: '', vdvProfileId: '', tenantId: '' }

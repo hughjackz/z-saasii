@@ -8,8 +8,7 @@
       </template>
     </PageHeader>
 
-    <TenantSelector v-if="auth.isCSAdmin" v-model="selectedTenant" @change="onTenantChange" />
-    <DeviceSelector v-model="selectedDevice" :devices="auth.isCSAdmin ? tenantDevices : null" />
+    <DeviceBanner :device="device" />
 
     <div class="toolbar">
       <input v-model="search" placeholder="Search key…" style="width:240px" />
@@ -64,19 +63,15 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
-import { ocppConfig, devices as devicesApi } from '@/api/index.js'
-import { useAuthStore } from '@/stores/auth.js'
-import DeviceSelector from '@/components/DeviceSelector.vue'
+import { ref, computed, watch } from 'vue'
+import { ocppConfig } from '@/api/index.js'
+import { useGlobalDevice } from '@/composables/useGlobalDevice.js'
 import PageHeader from '@/components/PageHeader.vue'
 import AppButton from '@/components/AppButton.vue'
-import TenantSelector from '@/components/TenantSelector.vue'
 import AppBadge from '@/components/AppBadge.vue'
+import DeviceBanner from '@/components/DeviceBanner.vue'
 
-const auth = useAuthStore()
-const selectedTenant = ref('')
-const tenantDevices = ref([])
-const selectedDevice = ref(null)
+const { device, deviceId } = useGlobalDevice()
 const configs = ref([])
 const configInitialized = ref(false)   // true once we've done at least one fetchAll
 const loading = ref(false)
@@ -124,7 +119,7 @@ async function loadConfigs(device) {
 // "Read All" button
 async function readAll() {
   loadingAll.value = true
-  try { await loadConfigs(selectedDevice.value) } finally { loadingAll.value = false }
+  try { await loadConfigs(deviceId.value) } finally { loadingAll.value = false }
 }
 
 // "Read Selected" — incremental fetch for selected keys
@@ -135,7 +130,7 @@ async function readSelected() {
   if (!targets.length) return
   loadingSelected.value = true
   try {
-    const res = await ocppConfig.getKeys(selectedDevice.value, targets)
+    const res = await ocppConfig.getKeys(deviceId.value, targets)
     // Also handle unknown keys from response
     const unknownKeys = res.unknownKey || []
     res.configurationKey.forEach(r => {
@@ -172,22 +167,13 @@ async function setSelected() {
   if (!dirty.length) return
   loadingSet.value = true
   try {
-    await ocppConfig.setKeys(selectedDevice.value, dirty.map(c => ({ key: c.key, value: c.pendingValue })))
+    await ocppConfig.setKeys(deviceId.value, dirty.map(c => ({ key: c.key, value: c.pendingValue })))
     dirty.forEach(c => { c.value = c.pendingValue; c.dirty = false })
   } finally { loadingSet.value = false }
 }
 
-async function fetchDevices() {
-  try {
-    const tid = auth.isCSAdmin && selectedTenant.value ? selectedTenant.value : undefined
-    tenantDevices.value = await devicesApi.list(tid ? { tenant_id: tid } : undefined)
-  } catch { tenantDevices.value = [] }
-}
-function onTenantChange() { selectedDevice.value = null; fetchDevices() }
-onMounted(fetchDevices)
-
 // Clear configs when device changes (user clicks Read All to fetch)
-watch(selectedDevice, () => {
+watch(deviceId, () => {
   configInitialized.value = false
   configs.value = []
 })

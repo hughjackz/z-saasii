@@ -1,8 +1,7 @@
 <template>
   <div>
     <PageHeader title="Maintenance" subtitle="Reset, firmware update, and log collection" />
-    <TenantSelector v-if="auth.isCSAdmin" v-model="selectedTenant" @change="onTenantChange" />
-    <DeviceSelector v-model="selectedDevice" :devices="auth.isCSAdmin ? tenantDevices : null" />
+    <DeviceBanner :device="device" />
 
     <div class="maint-grid">
       <AppCard title="Hard Reset">
@@ -69,20 +68,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { maintenance, devices as devicesApi } from '@/api/index.js'
-import { useAuthStore } from '@/stores/auth.js'
-import DeviceSelector from '@/components/DeviceSelector.vue'
+import { ref } from 'vue'
+import { maintenance } from '@/api/index.js'
+import { useGlobalDevice } from '@/composables/useGlobalDevice.js'
 import PageHeader from '@/components/PageHeader.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppButton from '@/components/AppButton.vue'
 import ConfirmModal from '@/components/ConfirmModal.vue'
-import TenantSelector from '@/components/TenantSelector.vue'
+import DeviceBanner from '@/components/DeviceBanner.vue'
 
-const auth = useAuthStore()
-const selectedTenant = ref('')
-const tenantDevices = ref([])
-const selectedDevice = ref(null)
+const { device, deviceId } = useGlobalDevice()
 const confirmReset = ref(false)
 const resetLoading = ref(false)
 const confirmLog = ref(false)
@@ -94,19 +89,11 @@ const fwResult = ref(null)
 const logResult = ref(null)
 const logForm = ref({ logType: 'DiagnosticsLog', retries: 3 })
 
-async function fetchDevices() {
-  try {
-    const tid = auth.isCSAdmin && selectedTenant.value ? selectedTenant.value : undefined
-    tenantDevices.value = await devicesApi.list(tid ? { tenant_id: tid } : undefined)
-  } catch { tenantDevices.value = [] }
-}
-function onTenantChange() { selectedDevice.value = null; fetchDevices() }
-
 function onFileChange(e) { fwFilename.value = e.target.files[0]?.name || ''; fwResult.value = null }
 
 async function doReset() {
   resetLoading.value = true
-  try { await maintenance.hardReset(selectedDevice.value); confirmReset.value = false }
+  try { await maintenance.hardReset(deviceId.value); confirmReset.value = false }
   finally { resetLoading.value = false }
 }
 
@@ -117,7 +104,7 @@ async function doFirmwareUpdate() {
   fd.append('firmware', file)
   fwLoading.value = true; fwResult.value = null
   try {
-    await maintenance.firmwareUpdate(selectedDevice.value, fd)
+    await maintenance.firmwareUpdate(deviceId.value, fd)
     fwResult.value = { ok: true, message: 'Firmware update initiated.' }
   } catch (e) {
     fwResult.value = { ok: false, message: e?.message || 'Upload failed' }
@@ -127,15 +114,13 @@ async function doFirmwareUpdate() {
 async function doGetLog() {
   logLoading.value = true; logResult.value = null
   try {
-    await maintenance.getLog(selectedDevice.value, logForm.value)
+    await maintenance.getLog(deviceId.value, logForm.value)
     confirmLog.value = false
     logResult.value = { ok: true, message: 'GetLog request sent.' }
   } catch (e) {
     logResult.value = { ok: false, message: e?.message || 'Request failed' }
   } finally { logLoading.value = false }
 }
-
-onMounted(fetchDevices)
 </script>
 
 <style scoped>
