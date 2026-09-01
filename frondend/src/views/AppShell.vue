@@ -41,7 +41,7 @@
       <div v-if="hasAnyOcpp" class="nav-section">
         <div class="nav-label">OCPP</div>
         <!-- OCPP 2.x device selected: only the 2.0.1 console is offered -->
-        <RouterLink v-if="ocpp2Selected && auth.hasPermission('ocpp.configuration')" to="/ocpp/ocpp201" class="nav-item" active-class="active">
+        <RouterLink v-if="ocpp2Selected && auth.hasPermission('ocpp.ocpp201')" to="/ocpp/ocpp201" class="nav-item" active-class="active">
           <i class="ti ti-terminal-2"></i> OCPP 2.0.1 Console
         </RouterLink>
         <template v-else>
@@ -137,7 +137,7 @@ const currentRouteName = computed(() => route.meta.title || route.name || 'Overv
 
 const roleColor = computed(() => ({ CS_Admin: 'red', CP_OP: 'amber', CP_OM: 'green' }[auth.role] || 'gray'))
 
-const ocppModules = ['ocpp.configuration','ocpp.transaction','ocpp.action','ocpp.maintenance','ocpp.pnc','ocpp.smartcharging']
+const ocppModules = ['ocpp.configuration','ocpp.transaction','ocpp.action','ocpp.maintenance','ocpp.pnc','ocpp.smartcharging','ocpp.ocpp201']
 const hasAnyOcpp = computed(() => ocppModules.some(m => auth.hasPermission(m)))
 
 // OCPP section swaps by selected device protocol (README 2.3.1/2.3.2)

@@ -159,6 +159,7 @@ const allModules = [
   { key: 'ocpp.maintenance', label: 'OCPP · Maintenance' },
   { key: 'ocpp.pnc', label: 'OCPP · PnC' },
   { key: 'ocpp.smartcharging', label: 'OCPP · Smart Charging' },
+  { key: 'ocpp.ocpp201', label: 'OCPP · 2.0.1 Console' },
   { key: 'vdv261', label: 'VDV 261' },
   { key: 'management.users', label: 'Management · Users' },
   { key: 'management.devices', label: 'Management · Devices' },

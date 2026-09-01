@@ -247,5 +247,5 @@ VALUES (
   NULL,
   NULL,
   'admin-0000-0000-0000-000000000001',
-  '["ocpp.configuration","ocpp.transaction","ocpp.action","ocpp.maintenance","ocpp.pnc","ocpp.smartcharging","vdv261","management.users","management.devices","management.certificates","management.idtags","management.profiles"]'
+  '["ocpp.configuration","ocpp.transaction","ocpp.action","ocpp.maintenance","ocpp.pnc","ocpp.smartcharging","ocpp.ocpp201","vdv261","management.users","management.devices","management.certificates","management.idtags","management.profiles"]'
 );
