@@ -35,6 +35,7 @@ func NewRouter(hub *ws.Hub) *gin.Engine {
 
 	auth.POST("/auth/logout", Logout)
 	auth.GET("/auth/me", Me)
+	auth.POST("/auth/change-password", ChangePassword)
 
 	// Events WebSocket
 	auth.GET("/events/ws", hub.ServeWS)

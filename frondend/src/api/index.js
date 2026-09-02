@@ -35,7 +35,9 @@ http.interceptors.response.use(
 export const auth = {
   login: (username, password) => http.post('/auth/login', { username, password }),
   logout: () => http.post('/auth/logout'),
-  me: () => http.get('/auth/me')
+  me: () => http.get('/auth/me'),
+  changePassword: (currentPassword, newPassword) =>
+    http.post('/auth/change-password', { currentPassword, newPassword })
 }
 
 // Devices

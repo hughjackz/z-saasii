@@ -22,6 +22,9 @@
           <AppBadge :color="roleColor">{{ auth.role }}</AppBadge>
           <!-- User menu -->
           <div v-if="showUserMenu" class="user-menu" @click.stop>
+            <div class="user-menu-item" @click="openChangePassword">
+              <i class="ti ti-key"></i> Change Password
+            </div>
             <div class="user-menu-item" @click="doLogout">
               <i class="ti ti-logout"></i> Sign out
             </div>
@@ -112,16 +115,39 @@
 
     <!-- Footer -->
     <footer class="botbar">CSMS SaaS Platform &nbsp;·&nbsp; © 2026</footer>
+
+    <!-- Change Password Modal -->
+    <AppModal v-model="showPwd" title="Change Password" width="420px">
+      <div class="pwd-grid">
+        <label>Current Password <span class="req">*</span></label>
+        <input v-model="pwdForm.current" type="password" autocomplete="current-password" placeholder="Enter current password" />
+        <label>New Password <span class="req">*</span></label>
+        <input v-model="pwdForm.next" type="password" autocomplete="new-password" placeholder="At least 8 characters" />
+        <label>Confirm New Password <span class="req">*</span></label>
+        <input v-model="pwdForm.confirm" type="password" autocomplete="new-password" placeholder="Repeat new password" />
+      </div>
+      <div v-if="pwdError" class="pwd-msg pwd-err">{{ pwdError }}</div>
+      <div v-if="pwdSuccess" class="pwd-msg pwd-ok">{{ pwdSuccess }}</div>
+      <template #footer>
+        <AppButton @click="closeChangePassword">Close</AppButton>
+        <AppButton variant="primary" :loading="pwdSaving" @click="doChangePassword">
+          <i class="ti ti-key"></i> Change Password
+        </AppButton>
+      </template>
+    </AppModal>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { auth as authApi } from '@/api/index.js'
 import { useAuthStore } from '@/stores/auth.js'
 import { useEventsStore } from '@/stores/events.js'
 import { useDevicesStore, isOcpp2 } from '@/stores/devices.js'
 import AppBadge from '@/components/AppBadge.vue'
+import AppButton from '@/components/AppButton.vue'
+import AppModal from '@/components/AppModal.vue'
 
 const auth = useAuthStore()
 const events = useEventsStore()
@@ -132,6 +158,50 @@ const router = useRouter()
 const clock = ref('')
 const showUserMenu = ref(false)
 const sidebarCollapsed = ref(false)
+
+// ── Change password (entry: topbar user menu) ──────────────────────────────
+const showPwd = ref(false)
+const pwdSaving = ref(false)
+const pwdError = ref('')
+const pwdSuccess = ref('')
+const pwdForm = ref({ current: '', next: '', confirm: '' })
+
+function openChangePassword() {
+  showUserMenu.value = false
+  pwdForm.value = { current: '', next: '', confirm: '' }
+  pwdError.value = ''
+  pwdSuccess.value = ''
+  showPwd.value = true
+}
+function closeChangePassword() {
+  if (pwdSaving.value) return
+  showPwd.value = false
+  pwdError.value = ''
+  pwdSuccess.value = ''
+}
+async function doChangePassword() {
+  pwdError.value = ''
+  pwdSuccess.value = ''
+  if (!pwdForm.value.current) { pwdError.value = 'Please enter the current password'; return }
+  if (!pwdForm.value.next || pwdForm.value.next.length < 8) {
+    pwdError.value = 'New password must be at least 8 characters'
+    return
+  }
+  if (pwdForm.value.next !== pwdForm.value.confirm) {
+    pwdError.value = 'New passwords do not match'
+    return
+  }
+  pwdSaving.value = true
+  try {
+    await authApi.changePassword(pwdForm.value.current, pwdForm.value.next)
+    pwdForm.value = { current: '', next: '', confirm: '' }
+    pwdSuccess.value = 'Password changed successfully.'
+  } catch (e) {
+    pwdError.value = e?.error || e?.message || 'Failed to change password'
+  } finally {
+    pwdSaving.value = false
+  }
+}
 
 const currentRouteName = computed(() => route.meta.title || route.name || 'Overview')
 
@@ -264,4 +334,12 @@ onUnmounted(() => clearInterval(timer))
   display: flex; align-items: center; justify-content: center;
   font-size: 11px; color: var(--text3);
 }
+
+/* Change password modal */
+.pwd-grid { display: grid; grid-template-columns: 1fr; gap: 4px 10px; }
+.pwd-grid label { margin-top: 8px; }
+.pwd-msg { margin-top: 12px; padding: 8px 12px; border-radius: var(--radius); font-size: 12px; }
+.pwd-err { background: #fcebeb; color: #a32d2d; }
+.pwd-ok { background: #e8f5ee; color: #1a6b4a; }
+.req { color: var(--accent); }
 </style>

@@ -8,6 +8,37 @@
 
     <DeviceBanner :device="deviceInfo" />
 
+    <!-- OCPP module quick access (README 2.3.2: configuration/transaction/
+         action/maintenance/PnC are available for both protocols) -->
+    <AppCard style="margin-bottom:14px">
+      <template #header>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:13px;font-weight:500">OCPP Modules</span>
+          <span style="font-size:11px;color:var(--text3)">Protocol-aware operations for this device</span>
+        </div>
+      </template>
+      <div class="module-row">
+        <AppButton v-if="auth.hasPermission('ocpp.configuration')" @click="router.push('/ocpp/configuration')">
+          <i class="ti ti-settings"></i> Configuration
+        </AppButton>
+        <AppButton v-if="auth.hasPermission('ocpp.transaction')" @click="router.push('/ocpp/transactions')">
+          <i class="ti ti-receipt"></i> Transactions
+        </AppButton>
+        <AppButton v-if="auth.hasPermission('ocpp.action')" @click="router.push('/ocpp/actions')">
+          <i class="ti ti-player-play"></i> Actions
+        </AppButton>
+        <AppButton v-if="auth.hasPermission('ocpp.maintenance')" @click="router.push('/ocpp/maintenance')">
+          <i class="ti ti-tool"></i> Maintenance
+        </AppButton>
+        <AppButton v-if="auth.hasPermission('ocpp.pnc')" @click="router.push('/ocpp/pnc')">
+          <i class="ti ti-certificate"></i> PnC
+        </AppButton>
+        <AppButton v-if="auth.hasPermission('ocpp.smartcharging')" @click="router.push('/ocpp/smart-charging')">
+          <i class="ti ti-bolt"></i> Smart Charging
+        </AppButton>
+      </div>
+    </AppCard>
+
     <!-- Device info -->
     <div class="info-grid">
       <div class="info-item"><label>Device ID</label><strong>{{ deviceInfo?.id }}</strong></div>
@@ -151,10 +182,12 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { transactions, devices as devicesApi } from '@/api/index.js'
 import { useGlobalDevice } from '@/composables/useGlobalDevice.js'
 import { useEventsStore } from '@/stores/events.js'
+import { useAuthStore } from '@/stores/auth.js'
 import PageHeader from '@/components/PageHeader.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
@@ -163,6 +196,8 @@ import DeviceBanner from '@/components/DeviceBanner.vue'
 
 const { device, deviceId } = useGlobalDevice()
 const eventsStore = useEventsStore()
+const auth = useAuthStore()
+const router = useRouter()
 
 const deviceInfo = ref(null)
 const active = ref([])
@@ -240,6 +275,7 @@ watch(deviceId, refresh)
 code { font-size: 11px; background: var(--bg); padding: 2px 6px; border-radius: 4px; }
 .dot { width:6px;height:6px;border-radius:50%;display:inline-block; }
 .dot-green { background:#1d9e75; }
+.module-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .info-grid {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px;
 }
