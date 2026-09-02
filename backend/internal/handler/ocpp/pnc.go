@@ -135,6 +135,7 @@ func DeleteCertificateOnDevice(c *gin.Context) {
 	}
 
 	// Find the certificate and extract hash data
+	// serialNumber is sent as uppercase hex (OCPP certificateHashData).
 	var certHashData map[string]string
 	for _, cert := range allCerts {
 		if cert.Name == req.CertName {
@@ -142,7 +143,7 @@ func DeleteCertificateOnDevice(c *gin.Context) {
 				"hashAlgorithm":  cert.HashAlgorithm,
 				"issuerNameHash": cert.IssuerNameHash,
 				"issuerKeyHash":  cert.IssuerKeyHash,
-				"serialNumber":   cert.SerialNumber,
+				"serialNumber":   repository.CertSerialToHex(cert.SerialNumber),
 			}
 			if req.CertType == "" {
 				req.CertType = cert.Type

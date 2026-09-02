@@ -91,7 +91,8 @@ func handleGetInstalledCertificateIds(dc *ocppws.DeviceConnection, call *ocppws.
 				"hashAlgorithm":  c.HashAlgorithm,
 				"issuerNameHash": c.IssuerNameHash,
 				"issuerKeyHash":  c.IssuerKeyHash,
-				"serialNumber":   c.SerialNumber,
+				// serialNumber must be uppercase hex (19960122 → 130913A)
+				"serialNumber": repository.CertSerialToHex(c.SerialNumber),
 			},
 		})
 	}

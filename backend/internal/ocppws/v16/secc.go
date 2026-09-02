@@ -200,7 +200,7 @@ func SignLeafCSR(csrPEM, deviceName, tenantID string, sp *seccPending, leafType 
 		Type:               leafType,
 		Content:        signedPEM,
 		PrivateKey:     "", // SECC Leaf private key stays on device
-		SerialNumber:       fmt.Sprintf("%x", serialNo),
+		SerialNumber:       fmt.Sprintf("%X", serialNo),
 		IssuerName:         issuerCert.Issuer.String(),
 		SubjectName:        csr.Subject.String(),
 		PublicKey:          string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: csr.RawSubjectPublicKeyInfo})),

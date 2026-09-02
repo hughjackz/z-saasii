@@ -18,6 +18,20 @@ func NormalizePEM(s string) string {
 	return s
 }
 
+// CertSerialToHex normalizes a certificate serialNumber to the uppercase hex
+// string used in device interactions (OCPP certificateHashData.serialNumber),
+// e.g. 19960122 → "130913A". Since migration 003, the certificate table
+// stores serials in uppercase hex already; this only strips a 0x prefix and
+// uppercases as a safety net.
+func CertSerialToHex(serial string) string {
+	serial = strings.TrimSpace(serial)
+	if serial == "" {
+		return ""
+	}
+	serial = strings.TrimPrefix(strings.TrimPrefix(serial, "0x"), "0X")
+	return strings.ToUpper(serial)
+}
+
 func ListCertificates(callerRole model.Role, callerID string, tenantID string, certType string) ([]*model.Certificate, error) {
 	q := `SELECT c.id, c.name, c.cert_group, c.type, c.file_path, c.private_key_path,
 		  c.serial_number, c.issuer_name, c.subject_name, c.public_key,

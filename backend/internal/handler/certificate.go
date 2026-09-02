@@ -8,6 +8,7 @@ import (
 	"encoding/pem"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -66,7 +67,9 @@ func UploadCertificate(c *gin.Context) {
 	var validFrom, validTo *time.Time
 	if block, _ := pem.Decode(content); block != nil {
 		if cert, err := x509.ParseCertificate(block.Bytes); err == nil {
-			serialNo = cert.SerialNumber.String()
+			// Serial numbers are stored and used in uppercase hex
+			// (device interactions use hex, e.g. 19960122 → 130913A).
+			serialNo = strings.ToUpper(cert.SerialNumber.Text(16))
 			issuer = cert.Issuer.String()
 			subject = cert.Subject.String()
 			sigAlg = cert.SignatureAlgorithm.String()
