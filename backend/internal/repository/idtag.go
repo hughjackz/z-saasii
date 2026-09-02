@@ -44,8 +44,8 @@ func GetIDTagByTagID(tagID string) (*model.IDTag, error) {
 
 func CreateIDTag(t *model.IDTag) error {
 	t.ID = uuid.New().String()
-	_, err := DB.NamedExec(`INSERT INTO idtag (id,tag_id,parent_tag_id,status,expiry_time,owner_id,tenant_id,created_at,updated_at)
-		VALUES (:id,:tag_id,:parent_tag_id,:status,:expiry_time,:owner_id,:tenant_id,NOW(),NOW())`, t)
+	_, err := DB.NamedExec(`INSERT INTO idtag (id,tag_id,parent_tag_id,type,status,expiry_time,owner_id,tenant_id,created_at,updated_at)
+		VALUES (:id,:tag_id,:parent_tag_id,:type,:status,:expiry_time,:owner_id,:tenant_id,NOW(),NOW())`, t)
 	return err
 }
 

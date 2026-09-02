@@ -29,6 +29,10 @@ func handleStatusNotification(dc *ocppws.DeviceConnection, call *ocppws.CallMess
 	_ = json.Unmarshal(call.Payload, &req)
 
 	_ = repository.UpdateDeviceStatus(dc.DeviceName, req.Status)
+	// README 2.3.1: per-connector status for OCPP 1.6 (evseId=0)
+	if req.ConnectorID > 0 {
+		_ = repository.UpsertConnectorStatus(dc.DeviceID, 0, req.ConnectorID, req.Status)
+	}
 
 	sendResult(dc, call.MsgID, struct{}{})
 

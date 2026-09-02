@@ -14,19 +14,21 @@
         <option value="">All protocols</option>
         <option value="OCPP16">OCPP 1.6</option>
         <option value="OCPP201">OCPP 2.0.1</option>
+        <option value="OCPP21">OCPP 2.1</option>
       </select>
     </div>
 
     <div class="card-table">
       <table>
         <thead>
-          <tr><th>Device Name</th><th>Protocol</th><th>Location</th><th>Owner</th><th>Heartbeat</th><th>Status</th><th>Actions</th></tr>
+          <tr><th>Device Name</th><th>Protocol</th><th>Topology</th><th>Location</th><th>Owner</th><th>Heartbeat</th><th>Status</th><th>Actions</th></tr>
         </thead>
         <tbody>
-          <tr v-if="loading"><td colspan="7" class="empty-cell">Loading...</td></tr>
+          <tr v-if="loading"><td colspan="8" class="empty-cell">Loading...</td></tr>
           <tr v-for="d in filtered" :key="d.id">
             <td><strong>{{ d.name }}</strong></td>
             <td><code>{{ d.protocol }}</code></td>
+            <td>{{ topologyLabel(d) }}</td>
             <td>{{ d.location }}</td>
             <td>{{ d.ownerName || '—' }}</td>
             <td>{{ d.heartbeatInterval }}s</td>
@@ -56,9 +58,10 @@
         <div><label>Device Name</label><input v-model="form.name" placeholder="CP-007" /></div>
         <div>
           <label>Protocol</label>
-          <select v-model="form.protocol">
+          <select v-model="form.protocol" @change="onProtocolChange">
             <option value="OCPP16">OCPP 1.6</option>
             <option value="OCPP201">OCPP 2.0.1</option>
+            <option value="OCPP21">OCPP 2.1</option>
           </select>
         </div>
         <div><label>Location</label><input v-model="form.location" placeholder="Station A" /></div>
@@ -66,6 +69,17 @@
           <label>Heartbeat Interval (s)</label>
           <input v-model.number="form.heartbeatInterval" type="number" min="10" max="3600" />
         </div>
+
+        <!-- Topology per protocol (README 2.3.4.3) -->
+        <div v-if="isOcpp2Protocol(form.protocol)">
+          <label>EVSE Count <span class="req">*</span></label>
+          <input v-model.number="form.evseNo" type="number" min="1" max="64" />
+        </div>
+        <div>
+          <label>{{ isOcpp2Protocol(form.protocol) ? 'Connectors per EVSE' : 'Connector Count' }} <span class="req">*</span></label>
+          <input v-model.number="form.connectorNo" type="number" min="1" max="16" />
+        </div>
+
         <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
           <input type="checkbox" v-model="form.enabled" id="dev-enabled" style="width:auto" />
           <label for="dev-enabled" style="margin:0">Device enabled</label>
@@ -87,7 +101,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { devices as devicesApi, users as usersApi } from '@/api/index.js'
 import { useAuthStore } from '@/stores/auth.js'
-import { useDevicesStore } from '@/stores/devices.js'
+import { useDevicesStore, isOcpp2 } from '@/stores/devices.js'
 import PageHeader from '@/components/PageHeader.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppBadge from '@/components/AppBadge.vue'
@@ -111,6 +125,31 @@ const showConfirm = ref(false)
 const delTarget = ref(null)
 const deleting = ref(false)
 
+function isOcpp2Protocol(p) { return isOcpp2(p) }
+
+// "2 connectors" (OCPP16) / "2 EVSE × 1 conn" (OCPP201/21)
+function topologyLabel(d) {
+  if (isOcpp2(d.protocol)) {
+    const ev = d.evseNo > 0 ? d.evseNo : 2
+    const cn = d.connectorNo > 0 ? d.connectorNo : 1
+    return `${ev} EVSE × ${cn} conn`
+  }
+  return `${d.connectorNo > 0 ? d.connectorNo : 2} connectors`
+}
+
+// Protocol-dependent defaults (README 2.3.4.3):
+//   OCPP16: connectorNo default 2
+//   OCPP201/OCPP21: evseNo default 2, connectorNo default 1
+function onProtocolChange() {
+  if (isOcpp2Protocol(form.value.protocol)) {
+    if (!form.value.evseNo) form.value.evseNo = 2
+    if (!form.value.connectorNo) form.value.connectorNo = 1
+  } else {
+    form.value.evseNo = 0
+    if (!form.value.connectorNo) form.value.connectorNo = 2
+  }
+}
+
 const filtered = computed(() => {
   let l = list.value
   if (protocolFilter.value) l = l.filter(d => d.protocol === protocolFilter.value)
@@ -123,10 +162,21 @@ function getTenantId() { return auth.isCSAdmin ? selectedTenant.value : (auth.te
 
 function openCreate() {
   editing.value = null
-  form.value = { name: '', protocol: 'OCPP16', location: '', heartbeatInterval: 60, enabled: true, ownerId: '', tenantId: getTenantId() }
+  form.value = {
+    name: '', protocol: 'OCPP16', location: '', heartbeatInterval: 60, enabled: true,
+    ownerId: '', tenantId: getTenantId(),
+    connectorNo: 2, evseNo: 0
+  }
   showForm.value = true
 }
-function openEdit(d) { editing.value = d; form.value = { ...d }; showForm.value = true }
+function openEdit(d) {
+  editing.value = d
+  form.value = { ...d }
+  // Normalize legacy records without topology fields
+  if (!form.value.connectorNo) form.value.connectorNo = isOcpp2(d.protocol) ? 1 : 2
+  if (!form.value.evseNo) form.value.evseNo = isOcpp2(d.protocol) ? 2 : 0
+  showForm.value = true
+}
 function confirmDel(d) { delTarget.value = d; showConfirm.value = true }
 
 async function load() {
@@ -138,6 +188,8 @@ async function save() {
   saving.value = true
   try {
     const payload = { ...form.value, tenantId: form.value.tenantId || getTenantId() }
+    // OCPP 1.6 has no EVSEs
+    if (!isOcpp2Protocol(payload.protocol)) payload.evseNo = 0
     if (editing.value) await devicesApi.update(editing.value.id, payload)
     else await devicesApi.create(payload)
     showForm.value = false; await load()

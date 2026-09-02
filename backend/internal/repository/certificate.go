@@ -1,9 +1,22 @@
 package repository
 
 import (
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/yourorg/csms-backend/internal/model"
 )
+
+// NormalizePEM repairs PEM content that was stored with escaped newlines
+// (literal "\r\n" / "\n" text) or bare CRs. Some upload tools / older records
+// store PEM as an escaped JSON string; crypto parsers need real newlines.
+func NormalizePEM(s string) string {
+	s = strings.ReplaceAll(s, `\r\n`, "\n")
+	s = strings.ReplaceAll(s, `\n`, "\n")
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.ReplaceAll(s, "\r", "\n")
+	return s
+}
 
 func ListCertificates(callerRole model.Role, callerID string, tenantID string, certType string) ([]*model.Certificate, error) {
 	q := `SELECT c.id, c.name, c.cert_group, c.type, c.file_path, c.private_key_path,
@@ -55,6 +68,9 @@ func FindCertByHash(issuerNameHash, issuerKeyHash string) (bool, error) {
 func FindCertBySubject(issuerName string) (*model.Certificate, error) {
 	var c model.Certificate
 	err := DB.Get(&c, "SELECT id, name, type, content, subject_name FROM certificate WHERE subject_name=? AND type LIKE '%Root%' LIMIT 1", issuerName)
+	if err == nil {
+		c.Content = NormalizePEM(c.Content)
+	}
 	return &c, err
 }
 
@@ -78,7 +94,7 @@ func GetCertificateContent(id string) (string, string, error) {
 		PrivateKey string `db:"private_key"`
 	}
 	err := DB.Get(&row, "SELECT content, private_key FROM certificate WHERE id=?", id)
-	return row.Content, row.PrivateKey, err
+	return NormalizePEM(row.Content), NormalizePEM(row.PrivateKey), err
 }
 
 func GetCertKeyAndPassphrase(id string) (content, privKey, passphrase string, err error) {
@@ -88,7 +104,7 @@ func GetCertKeyAndPassphrase(id string) (content, privKey, passphrase string, er
 		KeyPassphrase string `db:"key_passphrase"`
 	}
 	err = DB.Get(&row, "SELECT content, private_key, key_passphrase FROM certificate WHERE id=?", id)
-	return row.Content, row.PrivateKey, row.KeyPassphrase, err
+	return NormalizePEM(row.Content), NormalizePEM(row.PrivateKey), row.KeyPassphrase, err
 }
 
 func GetPrivateKey(id string) (string, error) {

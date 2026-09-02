@@ -58,6 +58,7 @@ export const ocppConfig = {
 export const transactions = {
   list: (deviceId, params) => http.get(`/ocpp/${deviceId}/transactions`, { params }),
   active: deviceId => http.get(`/ocpp/${deviceId}/transactions/active`),
+  events: (deviceId, params) => http.get(`/ocpp/${deviceId}/transaction-events`, { params }),
   remoteStart: (deviceId, data) => http.post(`/ocpp/${deviceId}/remote-start`, data),
   remoteStop: (deviceId, data) => http.post(`/ocpp/${deviceId}/remote-stop`, data)
 }
@@ -77,7 +78,7 @@ export const maintenance = {
 export const pnc = {
   getInstalledCerts: (deviceId, type) =>
     http.post(`/ocpp/${deviceId}/get-installed-certificate-ids`, { certificateType: type }),
-  deleteCert: (deviceId, certName) => http.post(`/ocpp/${deviceId}/delete-certificate`, { certName }),
+  deleteCert: (deviceId, certName, certType) => http.post(`/ocpp/${deviceId}/delete-certificate`, { certName, certType }),
   installCert: (deviceId, certNames, certType) =>
     http.post(`/ocpp/${deviceId}/install-certificate`, { certNames, certType }),
   triggerCsr: deviceId => http.post(`/ocpp/${deviceId}/trigger-message`, { requestedMessage: 'SignCertificate' }),

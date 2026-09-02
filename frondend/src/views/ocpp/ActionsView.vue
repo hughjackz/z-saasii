@@ -6,13 +6,17 @@
     <div class="actions-grid">
       <!-- Remote Start -->
       <AppCard title="Remote Start">
+        <div v-if="ocpp2">
+          <label>EVSE ID</label>
+          <input v-model.number="startForm.evseId" type="number" min="1" placeholder="e.g. 1" />
+        </div>
         <label>Connector ID</label>
         <input v-model.number="startForm.connectorId" type="number" min="1" placeholder="e.g. 1" />
         <label>ID Tag <span v-if="tagsLoading" style="color:var(--text3)">(loading…)</span></label>
         <select v-model="startForm.idTag">
           <option value="">— select ID tag —</option>
           <option v-for="t in idTags" :key="t.id" :value="t.tagId">
-            {{ t.tagId }} ({{ t.status }})
+            {{ t.tagId }} ({{ t.status }})<span v-if="t.type"> · {{ t.type }}</span>
           </option>
         </select>
         <div v-if="!tagsLoading && !idTags.length" class="tag-hint">
@@ -35,8 +39,10 @@
 
       <!-- Remote Stop -->
       <AppCard title="Remote Stop">
+        <label>Connector ID</label>
+        <input v-model.number="stopForm.connectorId" type="number" min="1" placeholder="e.g. 1" />
         <label>Transaction ID</label>
-        <input v-model.number="stopForm.transactionId" type="number" placeholder="e.g. 10042" />
+        <input v-model="stopForm.transactionId" :type="ocpp2 ? 'text' : 'number'" placeholder="e.g. 10042" />
         <div class="btn-row">
           <AppButton variant="danger" :loading="stopLoading" @click="doStop">
             <i class="ti ti-player-stop"></i> Stop Transaction
@@ -51,10 +57,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { transactions, profiles as profilesApi, idtags as idtagsApi } from '@/api/index.js'
 import { useAuthStore } from '@/stores/auth.js'
 import { useGlobalDevice } from '@/composables/useGlobalDevice.js'
+import { isOcpp2 } from '@/stores/devices.js'
 import PageHeader from '@/components/PageHeader.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppButton from '@/components/AppButton.vue'
@@ -65,12 +72,14 @@ const { device, deviceId } = useGlobalDevice()
 const profiles = ref([])
 const idTags = ref([])
 const tagsLoading = ref(false)
-const startForm = ref({ connectorId: 1, idTag: '', profileId: '' })
-const stopForm = ref({ transactionId: null })
+const startForm = ref({ connectorId: 1, evseId: 1, idTag: '', profileId: '' })
+const stopForm = ref({ connectorId: 1, transactionId: null })
 const startLoading = ref(false)
 const stopLoading = ref(false)
 const startResult = ref(null)
 const stopResult = ref(null)
+
+const ocpp2 = computed(() => !!device.value && isOcpp2(device.value.protocol))
 
 // Load the ID tags owned by the selected device's CP_OP (README 2.3.2.2.2:
 // remote start must use an id tag belonging to the device's tenant).
@@ -95,7 +104,10 @@ async function doStart() {
   if (!deviceId.value) return
   startLoading.value = true; startResult.value = null
   try {
-    const res = await transactions.remoteStart(deviceId.value, startForm.value)
+    // OCPP 2.0.1 also needs evseId (README 2.3.2.2.2)
+    const payload = { ...startForm.value }
+    if (!ocpp2.value) delete payload.evseId
+    const res = await transactions.remoteStart(deviceId.value, payload)
     startResult.value = { ok: res.status === 'Accepted', message: `Status: ${res.status}` }
   } catch (e) {
     startResult.value = { ok: false, message: e?.message || 'Error' }
@@ -106,7 +118,12 @@ async function doStop() {
   if (!deviceId.value || !stopForm.value.transactionId) return
   stopLoading.value = true; stopResult.value = null
   try {
-    const res = await transactions.remoteStop(deviceId.value, stopForm.value)
+    // OCPP 1.6: {transactionId (int)}; OCPP 2.0.1: {transactionId (string)}
+    const payload = {
+      transactionId: ocpp2.value ? String(stopForm.value.transactionId) : Number(stopForm.value.transactionId)
+    }
+    const res = await transactions.remoteStop(deviceId.value, payload)
+    startResult.value = null
     stopResult.value = { ok: res.status === 'Accepted', message: `Status: ${res.status}` }
   } catch (e) {
     stopResult.value = { ok: false, message: e?.message || 'Error' }

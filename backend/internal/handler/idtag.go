@@ -35,22 +35,31 @@ func CreateIDTag(c *gin.Context) {
 	c.JSON(http.StatusCreated, t)
 }
 
+// idtagFieldMap maps accepted client field names to idtag table columns.
+var idtagFieldMap = map[string]string{
+	"tagId":       "tag_id",
+	"tag_id":      "tag_id",
+	"parentTagId": "parent_tag_id",
+	"parent_tag_id": "parent_tag_id",
+	"type":        "type",
+	"status":      "status",
+	"expiryTime":  "expiry_time",
+	"expiry_time": "expiry_time",
+}
+
 func UpdateIDTag(c *gin.Context) {
 	var fields map[string]interface{}
 	if err := c.ShouldBindJSON(&fields); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	for _, f := range []string{
-		"id",
-		"createdAt", "created_at",
-		"updatedAt", "updated_at",
-		"ownerId", "owner_id",
-		"tenantId", "tenant_id",
-	} {
-		delete(fields, f)
+	normalized := make(map[string]interface{})
+	for k, v := range fields {
+		if col, ok := idtagFieldMap[k]; ok {
+			normalized[col] = v
+		}
 	}
-	if err := repository.UpdateIDTag(c.Param("id"), fields); err != nil {
+	if err := repository.UpdateIDTag(c.Param("id"), normalized); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

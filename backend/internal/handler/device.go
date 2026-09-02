@@ -44,6 +44,23 @@ func ListDevices(c *gin.Context) {
 		}
 	}
 
+	// Attach per-connector / per-EVSE status (README 2.3.1)
+	if len(devices) > 0 {
+		ids := make([]string, 0, len(devices))
+		for _, d := range devices {
+			ids = append(ids, d.ID)
+		}
+		if statuses, err := repository.ListConnectorStatuses(ids); err == nil {
+			for _, d := range devices {
+				if s, ok := statuses[d.ID]; ok {
+					d.ConnectorStatuses = s
+				} else {
+					d.ConnectorStatuses = []*model.ConnectorStatus{}
+				}
+			}
+		}
+	}
+
 	c.JSON(http.StatusOK, devices)
 }
 
@@ -52,6 +69,14 @@ func GetDeviceHandler(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 		return
+	}
+	if ocppws.Default != nil {
+		d.Online = ocppws.Default.IsConnected(d.ID)
+	}
+	if statuses, err := repository.ListConnectorStatusesByDevice(d.ID); err == nil {
+		d.ConnectorStatuses = statuses
+	} else {
+		d.ConnectorStatuses = []*model.ConnectorStatus{}
 	}
 	c.JSON(http.StatusOK, d)
 }
@@ -76,23 +101,36 @@ func CreateDevice(c *gin.Context) {
 	c.JSON(http.StatusCreated, created)
 }
 
+// deviceFieldMap maps accepted client field names (camelCase or snake_case)
+// to device table columns. Anything else is rejected — the frontend sends the
+// whole device object back on edit.
+var deviceFieldMap = map[string]string{
+	"name":              "name",
+	"protocol":          "protocol",
+	"location":          "location",
+	"enabled":           "enabled",
+	"heartbeatInterval": "heartbeat_interval",
+	"heartbeat_interval": "heartbeat_interval",
+	"connectorNo":       "connector_no",
+	"connector_no":      "connector_no",
+	"evseNo":            "evse_no",
+	"evse_no":           "evse_no",
+}
+
 func UpdateDevice(c *gin.Context) {
 	var fields map[string]interface{}
 	if err := c.ShouldBindJSON(&fields); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	for _, f := range []string{
-		"id", "ownerName",
-		"createdAt", "created_at",
-		"updatedAt", "updated_at",
-		"lastHeartbeat", "last_heartbeat",
-		"status",
-		"tenantId", "tenant_id", // tenant cannot be changed
-	} {
-		delete(fields, f)
+
+	normalized := make(map[string]interface{})
+	for k, v := range fields {
+		if col, ok := deviceFieldMap[k]; ok {
+			normalized[col] = v
+		}
 	}
-	if err := repository.UpdateDevice(c.Param("id"), fields); err != nil {
+	if err := repository.UpdateDevice(c.Param("id"), normalized); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

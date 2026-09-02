@@ -43,15 +43,13 @@ router.beforeEach((to) => {
   if (!auth.loaded) return
   if (to.meta.module && !auth.hasPermission(to.meta.module)) return '/overview'
 
-  // Protocol-aware routing (README 2.3.1): only acts when a device is
-  // selected — the no-selection case is handled per-view after the store
-  // finishes loading (see useGlobalDevice).
+  // Protocol-aware routing (README 2.3.1): the 2.0.1 console only applies to
+  // OCPP 2.x devices; OCPP 1.6 devices fall back to the shared Configuration
+  // page. Configuration/Transactions/Actions/Maintenance/PnC are available
+  // for BOTH protocols (README 2.3.2) with protocol-specific data formats.
   const devices = useDevicesStore()
-  if (to.path.startsWith('/ocpp/') && devices.current) {
-    const targetIs201 = to.path === '/ocpp/ocpp201'
-    const deviceIs201 = isOcpp2(devices.current.protocol)
-    if (deviceIs201 && !targetIs201) return '/ocpp/ocpp201'
-    if (!deviceIs201 && targetIs201) return '/ocpp/configuration'
+  if (to.path === '/ocpp/ocpp201' && devices.current && !isOcpp2(devices.current.protocol)) {
+    return '/ocpp/configuration'
   }
 })
 export default router

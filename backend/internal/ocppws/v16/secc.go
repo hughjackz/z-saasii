@@ -29,6 +29,8 @@ type seccPending struct {
 	V2GRoot  string // cert name (from certificate library)
 	V2GSub1  string
 	V2GSub2  string
+	CPOSub1  string // used as intermediate for CP-leaf-cert signing
+	CPOSub2  string // used as issuer for CP-leaf-cert signing
 	CPOPName string
 }
 
@@ -46,6 +48,16 @@ func RecordSECCSession(deviceID, v2gRoot, v2gSub1, v2gSub2, cpopName string) {
 	}
 }
 
+// RecordCPLeafSession stores the operator's V2G root + CPO sub selections for
+// CP-leaf-cert signing (README 2.3.2.4.a, OCPP201 only).
+func RecordCPLeafSession(deviceID, v2gRoot, cpoSub1, cpoSub2, cpopName string) {
+	seccSessionsMu.Lock()
+	defer seccSessionsMu.Unlock()
+	seccSessions[deviceID] = &seccPending{
+		V2GRoot: v2gRoot, CPOSub1: cpoSub1, CPOSub2: cpoSub2, CPOPName: cpopName,
+	}
+}
+
 // GetSECCSession returns the pending session for a device (nil if none).
 func GetSECCSession(deviceID string) *seccPending {
 	seccSessionsMu.Lock()
@@ -54,10 +66,25 @@ func GetSECCSession(deviceID string) *seccPending {
 }
 
 // SignCSR signs the given PEM-encoded CSR using the V2G Sub2 private key
-// and returns the signed certificate in PEM format.
-// The signed cert is saved to resource/{cpopName}/certificate/{deviceName}_SECCLeaf_{serial}.pem
-// and recorded in the database and cert_serial table.
+// and returns the signed certificate in PEM format (SECC-leaf-cert).
+// The signed cert is recorded in the database (certificate + cert_serial).
 func SignCSR(csrPEM, deviceName, tenantID string, sp *seccPending) (string, error) {
+	return SignLeafCSR(csrPEM, deviceName, tenantID, sp, "SECC-leaf-cert")
+}
+
+// SignLeafCSR signs a CSR as either a SECC-leaf-cert (issuer: V2G Sub2) or a
+// CP-leaf-cert (issuer: CPO Sub2, per README 2.3.2.4.a). The returned PEM is
+// stored in the certificate table and the serial counter is incremented per
+// cert type (cert_serial.cert_type).
+func SignLeafCSR(csrPEM, deviceName, tenantID string, sp *seccPending, leafType string) (string, error) {
+	issuerName, serialType, fileNamePrefix := sp.V2GSub2, "SECCLeaf", "SECCLeaf"
+	if leafType == "CP-leaf-cert" {
+		issuerName, serialType, fileNamePrefix = sp.CPOSub2, "CPLeaf", "CPLeaf"
+		if issuerName == "" {
+			return "", fmt.Errorf("CPO Sub2 not selected for CP-leaf signing")
+		}
+	}
+
 	// 1. Parse CSR
 	block, _ := pem.Decode([]byte(csrPEM))
 	if block == nil {
@@ -71,15 +98,10 @@ func SignCSR(csrPEM, deviceName, tenantID string, sp *seccPending) (string, erro
 		return "", fmt.Errorf("CSR signature invalid: %w", err)
 	}
 
-	// 2. Get V2G Sub2 issuer certificate and private key
-	// Look up by name "V2G_{name}_sub2" pattern or search cert library
-	issuerCertPEM, issuerKeyPEM, keyPass, err := findCertAndKey(sp.V2GSub2)
-	fmt.Println("V2G Sub2.filename:" + sp.V2GSub2)
-	fmt.Println("V2G Sub2.certcontent:" + issuerCertPEM)
-	fmt.Println("V2G Sub2.keycontent:" + issuerKeyPEM)
-
+	// 2. Get issuer certificate and private key from the certificate library
+	issuerCertPEM, issuerKeyPEM, keyPass, err := findCertAndKey(issuerName)
 	if err != nil {
-		return "", fmt.Errorf("V2G Sub2 not found: %w", err)
+		return "", fmt.Errorf("issuer certificate %q not found: %w", issuerName, err)
 	}
 
 	issuerBlock, _ := pem.Decode([]byte(issuerCertPEM))
@@ -139,8 +161,8 @@ func SignCSR(csrPEM, deviceName, tenantID string, sp *seccPending) (string, erro
 		return "", fmt.Errorf("failed to parse private key: %w", keyErr)
 	}
 
-	// 3. Get next serial number
-	serialNo, err := repository.GetNextSerialNumber(tenantID, "SECCLeaf")
+	// 3. Get next serial number (per cert type; initial 0x13155BC)
+	serialNo, err := repository.GetNextSerialNumber(tenantID, serialType)
 	if err != nil {
 		return "", fmt.Errorf("serial number: %w", err)
 	}
@@ -167,15 +189,15 @@ func SignCSR(csrPEM, deviceName, tenantID string, sp *seccPending) (string, erro
 
 	signedPEM := string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER}))
 
-	fileName := fmt.Sprintf("%s_SECCLeaf_%d.pem", deviceName, serialNo)
+	fileName := fmt.Sprintf("%s_%s_%d.pem", deviceName, fileNamePrefix, serialNo)
 
 	// 6. Store in database only (no local file — README 2.3.4.2)
 	notBefore := issuerCert.NotBefore.UTC()
 	notAfter := issuerCert.NotAfter.UTC()
 	cert := &model.Certificate{
-		Name:           fileName,
-		CertGroup:      deviceName,
-		Type:           "SECC-leaf-cert",
+		Name:               fileName,
+		CertGroup:          deviceName,
+		Type:               leafType,
 		Content:        signedPEM,
 		PrivateKey:     "", // SECC Leaf private key stays on device
 		SerialNumber:       fmt.Sprintf("%x", serialNo),

@@ -1,8 +1,11 @@
 package v201
 
 // certs.go — ISO 15118 certificate-related handlers (README 4.3.8-4.3.13).
-// Reuses the v16 package's exported PNC helpers (SECC session, CSR signing,
-// contract-certificate EXI generator).
+// certificateType (CertificateSigningUseEnumType) distinguishes:
+//   - V2GCertificate              → SECC-leaf-cert  (issuer: V2G Sub2)
+//   - ChargingStationCertificate  → CP-leaf-cert    (issuer: CPO Sub2)
+// Both flows reuse the v16 package's exported PNC helpers (session records,
+// CSR signing, contract-certificate EXI generator).
 
 import (
 	"encoding/json"
@@ -16,15 +19,29 @@ import (
 	"github.com/yourorg/csms-backend/internal/repository"
 )
 
-// ─── CertificateSigned ──────────────────────────────────────────────────────
+// Leaf type mapping for certificateType (CertificateSigningUseEnumType).
+func leafTypeForCertificateType(certificateType string) string {
+	if certificateType == "ChargingStationCertificate" {
+		return "CP-leaf-cert"
+	}
+	// default / "V2GCertificate"
+	return "SECC-leaf-cert"
+}
+
+// ─── CertificateSigned (device confirms receiving the cert) ────────────────
 // Schema: CertificateSignedResponse.json — requires status.
 
 func handleCertificateSigned(dc *ocppws.DeviceConnection, call *ocppws.CallMessage, eventCh chan<- *model.Event) {
+	var req struct {
+		CertificateType string `json:"certificateType"`
+	}
+	_ = json.Unmarshal(call.Payload, &req)
 	sendResult(dc, call.MsgID, map[string]string{"status": "Accepted"})
-	pushEvent(eventCh, dc.TenantID, "info", dc.DeviceName, "CertificateSigned acknowledged (2.0.1)")
+	pushEvent(eventCh, dc.TenantID, "info", dc.DeviceName,
+		"CertificateSigned acknowledged (2.0.1, certificateType="+req.CertificateType+")")
 }
 
-// ─── DeleteCertificate ──────────────────────────────────────────────────────
+// ─── DeleteCertificate (device confirms deletion) ───────────────────────────
 // Schema: DeleteCertificateResponse.json — requires status.
 
 func handleDeleteCertificate(dc *ocppws.DeviceConnection, call *ocppws.CallMessage, eventCh chan<- *model.Event) {
@@ -32,7 +49,7 @@ func handleDeleteCertificate(dc *ocppws.DeviceConnection, call *ocppws.CallMessa
 	pushEvent(eventCh, dc.TenantID, "info", dc.DeviceName, "DeleteCertificate acknowledged (2.0.1)")
 }
 
-// ─── InstallCertificate ─────────────────────────────────────────────────────
+// ─── InstallCertificate (device confirms installation) ──────────────────────
 // Schema: InstallCertificateResponse.json — requires status.
 
 func handleInstallCertificate(dc *ocppws.DeviceConnection, call *ocppws.CallMessage, eventCh chan<- *model.Event) {
@@ -40,11 +57,11 @@ func handleInstallCertificate(dc *ocppws.DeviceConnection, call *ocppws.CallMess
 	pushEvent(eventCh, dc.TenantID, "info", dc.DeviceName, "InstallCertificate acknowledged (2.0.1)")
 }
 
-// ─── GetInstalledCertificateIds ─────────────────────────────────────────────
-// Device asks which certificates it should install. Responds with the
-// tenant's root certificates (V2G root / MO root) from the certificate DB.
-// Schema: GetInstalledCertificateIdsResponse.json — requires status;
-// certificateHashDataChain items require certificateType + certificateHashData.
+// ─── GetInstalledCertificateIds (device → CSMS, M03) ────────────────────────
+// The device asks which certificates the CSMS wants installed (or which are
+// relevant). Respond with the tenant's root certificates from the cert DB.
+// Schema: GetInstalledCertificateIdsResponse.json — status +
+// certificateHashDataChain (certificateType + certificateHashData).
 
 func handleGetInstalledCertificateIds(dc *ocppws.DeviceConnection, call *ocppws.CallMessage, eventCh chan<- *model.Event) {
 	certs, err := repository.ListCertificates(model.RoleCSAdmin, "", dc.TenantID, "")
@@ -86,8 +103,8 @@ func handleGetInstalledCertificateIds(dc *ocppws.DeviceConnection, call *ocppws.
 }
 
 // ─── Get15118EVCertificate ──────────────────────────────────────────────────
-// Device requests a contract certificate for the EV. Mirrors the v16 PNC
-// handler (v16/pnc.go Get15118EVCertificate) minus the DataTransfer wrapper.
+// Device requests a contract certificate for the EV (M01/M02). Mirrors the v16
+// PNC handler minus the DataTransfer wrapper.
 // Schema: Get15118EVCertificateResponse.json — requires status + exiResponse.
 
 type get15118EVCertReq struct {
@@ -156,7 +173,10 @@ func handleGet15118EVCertificate(dc *ocppws.DeviceConnection, call *ocppws.CallM
 }
 
 // ─── SignCertificate ────────────────────────────────────────────────────────
-// Device sends a CSR for SECC Leaf signing (mirrors the v16 PNC flow).
+// Device sends a CSR + certificateType for leaf signing (A02 flow).
+// certificateType selects the leaf type: V2GCertificate → SECC-leaf-cert,
+// ChargingStationCertificate → CP-leaf-cert. The operator's recorded session
+// (README 2.3.2.4.a) selects the issuer chain.
 // Schema: SignCertificateResponse.json — requires status (Accepted/Rejected).
 
 type signCertificateReq struct {
@@ -172,40 +192,47 @@ func handleSignCertificate(dc *ocppws.DeviceConnection, call *ocppws.CallMessage
 		return
 	}
 
+	leafType := leafTypeForCertificateType(req.CertificateType)
 	session := v16.GetSECCSession(dc.DeviceID)
 	if session == nil {
-		log.Printf("[ocppws/v201] SignCertificate from %s but no pending SECC session", dc.DeviceName)
+		log.Printf("[ocppws/v201] SignCertificate from %s but no pending signing session", dc.DeviceName)
 		sendResult(dc, call.MsgID, map[string]string{"status": "Rejected"})
 		return
 	}
 
-	log.Printf("[ocppws/v201] Signing SECC Leaf for %s with V2G Sub2=%s", dc.DeviceName, session.V2GSub2)
+	log.Printf("[ocppws/v201] Signing %s for %s (certificateType=%s)", leafType, dc.DeviceName, req.CertificateType)
 
-	signedCert, err := v16.SignCSR(req.CSR, dc.DeviceName, dc.TenantID, session)
+	signedCert, err := v16.SignLeafCSR(req.CSR, dc.DeviceName, dc.TenantID, session, leafType)
 	if err != nil {
-		log.Printf("[ocppws/v201] SECC signing failed for %s: %v", dc.DeviceName, err)
+		log.Printf("[ocppws/v201] %s signing failed for %s: %v", leafType, dc.DeviceName, err)
 		sendResult(dc, call.MsgID, map[string]string{"status": "Rejected"})
-		pushEvent(eventCh, dc.TenantID, "error", dc.DeviceName, "SECC Leaf signing failed: "+err.Error())
+		pushEvent(eventCh, dc.TenantID, "error", dc.DeviceName, leafType+" signing failed: "+err.Error())
 		return
 	}
 
-	// Build certificate chain: SECC Leaf + V2G Sub2 + V2G Sub1
+	// Build certificate chain: Leaf + Sub2 + Sub1
+	sub2, sub1 := session.V2GSub2, session.V2GSub1
+	if leafType == "CP-leaf-cert" {
+		sub2, sub1 = session.CPOSub2, session.CPOSub1
+	}
 	certChain := signedCert
-	if c, _, err := findCertContent(session.V2GSub2); err == nil {
+	if c, _, err := findCertContent(sub2); err == nil {
 		certChain += c
 	}
-	if c, _, err := findCertContent(session.V2GSub1); err == nil {
+	if c, _, err := findCertContent(sub1); err == nil {
 		certChain += c
 	}
 
 	// Respond to SignCertificate first, then push CertificateSigned to the device
+	// (with certificateType — README 4.3.8).
 	sendResult(dc, call.MsgID, map[string]string{"status": "Accepted"})
 
 	certSignedCall, _ := ocppws.BuildCall(uuid.New().String(), "CertificateSigned",
-		map[string]string{"certificateChain": certChain})
+		map[string]string{"certificateType": req.CertificateType, "certificateChain": certChain})
 	dc.WriteCh <- certSignedCall
 
-	pushEvent(eventCh, dc.TenantID, "info", dc.DeviceName, "SECC Leaf certificate signed and sent to device (2.0.1)")
+	pushEvent(eventCh, dc.TenantID, "info", dc.DeviceName,
+		leafType+" signed and sent to device (2.0.1, certificateType="+req.CertificateType+")")
 }
 
 // findCertContent looks up a certificate's PEM content from the DB by name.

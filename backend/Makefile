@@ -15,7 +15,7 @@ tidy:
 	go mod tidy
 
 migrate:
-	mysql -u root -p < db/migrations/001_init.sql
+	mysql -u root -p < db/migrations/001_init.sql; mysql -u root -p < db/migrations/002_ocpp201_features.sql
 
 # pack → build + bundle into a deployable tarball.
 # Output: bin/csms-backend.tar.gz
@@ -26,7 +26,7 @@ pack: build
 	cp bin/csms-backend bin/pack/bin/
 	cp config/config.yaml bin/pack/config/
 	@if [ -d resource ]; then cp -r resource/* bin/pack/resource/ 2>/dev/null || true; fi
-	cp db/migrations/001_init.sql bin/pack/db/
+	cp db/migrations/001_init.sql db/migrations/002_ocpp201_features.sql bin/pack/db/
 	@echo '#!/bin/bash' > bin/pack/run.sh
 	@echo 'cd "$$(dirname $$0)"' >> bin/pack/run.sh
 	@echo 'echo "Starting CSMS Backend..."' >> bin/pack/run.sh

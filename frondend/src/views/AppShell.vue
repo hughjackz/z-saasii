@@ -40,11 +40,7 @@
 
       <div v-if="hasAnyOcpp" class="nav-section">
         <div class="nav-label">OCPP</div>
-        <!-- OCPP 2.x device selected: only the 2.0.1 console is offered -->
-        <RouterLink v-if="ocpp2Selected && auth.hasPermission('ocpp.ocpp201')" to="/ocpp/ocpp201" class="nav-item" active-class="active">
-          <i class="ti ti-terminal-2"></i> OCPP 2.0.1 Console
-        </RouterLink>
-        <template v-else>
+        <template>
           <RouterLink v-if="auth.hasPermission('ocpp.configuration')" to="/ocpp/configuration" class="nav-item" active-class="active">
             <i class="ti ti-settings"></i> Configuration
           </RouterLink>
@@ -62,6 +58,10 @@
           </RouterLink>
           <RouterLink v-if="auth.hasPermission('ocpp.smartcharging')" to="/ocpp/smart-charging" class="nav-item" active-class="active">
             <i class="ti ti-bolt"></i> Smart Charging
+          </RouterLink>
+          <!-- OCPP 2.x devices get the 2.0.1 console in addition (README 2.3.1) -->
+          <RouterLink v-if="ocpp2Selected && auth.hasPermission('ocpp.ocpp201')" to="/ocpp/ocpp201" class="nav-item" active-class="active">
+            <i class="ti ti-terminal-2"></i> OCPP 2.0.1 Console
           </RouterLink>
         </template>
       </div>

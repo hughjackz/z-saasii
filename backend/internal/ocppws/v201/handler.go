@@ -28,6 +28,15 @@ func HandleCall(dc *ocppws.DeviceConnection, call *ocppws.CallMessage, eventCh c
 		sendResult(dc, call.MsgID, struct{}{})
 	case "NotifyEvent":
 		sendResult(dc, call.MsgID, struct{}{})
+	case "SecurityEventNotification":
+		// README 4.3.14 — respond only
+		sendResult(dc, call.MsgID, struct{}{})
+		pushEvent(eventCh, dc.TenantID, "info", dc.DeviceName, "SecurityEventNotification acknowledged")
+	case "GetVariables":
+		// README 4.3.15 — CSMS-initiated normally; respond when device-initiated
+		sendResult(dc, call.MsgID, map[string]interface{}{"getVariableResult": []interface{}{}})
+	case "SetVariables":
+		sendResult(dc, call.MsgID, map[string]interface{}{"setVariableResult": []interface{}{}})
 	case "CertificateSigned":
 		handleCertificateSigned(dc, call, eventCh)
 	case "DeleteCertificate":

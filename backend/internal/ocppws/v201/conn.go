@@ -51,7 +51,12 @@ func handleBootNotification(dc *ocppws.DeviceConnection, call *ocppws.CallMessag
 
 	if status == "Accepted" {
 		_ = repository.UpdateDeviceStatus(dc.DeviceName, "Available")
-		pushEvent(eventCh, dc.TenantID, "info", dc.DeviceName, "Device boot notification accepted (2.0.1)")
+		// README 4.3.2: store bootreason, displayed in the frontend overview
+		if req.Reason != "" {
+			_ = repository.UpdateDeviceBootReason(dc.DeviceName, req.Reason)
+		}
+		pushEvent(eventCh, dc.TenantID, "info", dc.DeviceName,
+			"Device boot notification accepted (2.0.1, reason="+req.Reason+")")
 	}
 }
 
@@ -82,7 +87,12 @@ func handleStatusNotification(dc *ocppws.DeviceConnection, call *ocppws.CallMess
 	var req statusNotificationReq
 	_ = json.Unmarshal(call.Payload, &req)
 
-	_ = repository.UpdateDeviceStatus(dc.DeviceName, req.ConnectorStatus)
+	// README 4.3.4: handle evseId — store per-EVSE/per-connector status
+	// (displayed in the overview, 2.3.1).
+	if req.EvseID > 0 {
+		_ = repository.UpsertConnectorStatus(dc.DeviceID, req.EvseID, req.ConnectorID, req.ConnectorStatus)
+		_ = repository.UpdateDeviceStatus(dc.DeviceName, req.ConnectorStatus)
+	}
 
 	sendResult(dc, call.MsgID, struct{}{})
 

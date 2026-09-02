@@ -24,11 +24,13 @@
     2.3.1 OVERVIEW
         内容栏中构建顶部栏，如果是CS_Admin，需要有一个CP_OP筛选器，
         显示出该CP_OP的所有devices[前端请求，由后端告知]，及各个device的状态，登录时间,OCPP版本号等信息
+        如果设备是ocpp1.6协议，需要能够显示各个connectorid的状态，根据device属性中的connectorNo.进行排列
+        如果设备是ocpp2.0.1协议中，需要能够显示各个EVSE+connectorid的状态，根据device属性中的evseNo.和connectorNo.进行排列；还需要显示bootreason
         前端用户选择特性device后进入该设备的操作界面，根据OCPP协议版本号应该转至不同的操作页面，
     
     2.3.2 OCPP  
 
-        CP_OP和device应为全局数据,由用户在overview中选定
+        CP_OP和device，应为全局数据,由用户在overview中选定
         以下功能模块开放权限也由后端告知，前端根据开放权限进行展示
 
         在下述的功能模块中，有的需要向后端的发送请求，此时将CP_OP和device作为参数传送进去，以便后端能够明确知道待操作的设备
@@ -41,9 +43,12 @@
             第一次登录到管理后台的，因为没有相关缓存数据，要全部获取
             后续操作，支持单个的读取配置和修改数据，也支持部分配置的读取和设置
 
+            ocpp1.6和ocpp201均包含此功能，显示的数据按照具体的数据格式显示
+
         2.3.2.2 transaction
+            ocpp1.6和ocpp201均包含此功能，显示的数据按照具体的数据格式显示
             2.3.2.2.1 bill
-                显示过往的订单
+                显示过往的订单（需要transactionid的筛选器）
                 显示当前正在运行的订单
                 订单中的数据有
                     设备号 chargepointid
@@ -56,16 +61,24 @@
                     结束电能 stopmeter
                     消费电能 costenergy
             2.3.2.2.2 action
-                remote start，需要填入设备的连接号，启动button
-                remote stop， 需要填入设备的连接号和交易id，停止button
+                remote start，需要填入设备的connectorid（ocpp201还需要填入evesid），启动button
+                remote stop， 需要填入设备的connectorid和交易id，停止button
 
         2.3.2.3 maintaince
+            ocpp1.6和ocpp201均包含此功能，
+
             包含Hard Rest button，并click之后弹出确定的对话框之后，发送给后端Reset指令
             OTA升级，支持加载本地文件，将文件上传之后端服务器
             日志下载触发button，并click之后弹出确定的对话框之后，发送给后端Getlog指令
 
-        2.3.2.4 PNC 实现15118-2 P&C功能backend/doc/ocpp1.6/protocol/ocpp_1_6_ISO_15118_v10.pdf，对应本章节Part4.2.9描述
+        2.3.2.4 PNC 
+            ocpp1.6和ocpp201均包含此功能，
+            OCPP1.6 实现15118-2 P&C功能backend/doc/ocpp1.6/protocol/ocpp_1_6_ISO_15118_v10.pdf，对应本章节Part4.2.9描述
+            OCPP2.0.1 实现15118-2 P&C功能backend/doc/ocpp2.0.1/protocol/OCPP-2.0.1_edition4_part2_specification.pdf，对应本章节Part4.3描述
             a) 安装SECCLeaf证书
+                --操作者需要选择使用具体的V2G root,CPO sub1, CPO sub2证书作为签发者,有触发设备请求安装证书的button
+
+            a) 安装CPLeaf证书（暂时只在ocpp201中显示）
                 --操作者需要选择使用具体的V2G root,CPO sub1, CPO sub2证书作为签发者,有触发设备请求安装证书的button
 
             b) 安装ROOT证书，
@@ -82,6 +95,7 @@
                 --签发合同证书需要2.3.4.2中除了secc-leaf的所有证书类型各一个
                 --选择证书类型，然后向后端请求该类型的证书列表，用户在下拉框中确定一个该类型的证书
                 --将所有的类型的证书选择确定好之后，提交给后端
+                
         2.3.2.5 Smartcharging
 
     2.3.3 VDV261
@@ -138,33 +152,47 @@
             >OEM-sub2-cert
 
             >SECC-leaf-cert
+            >CP-leaf-cert
 
             前端界面上传证书（证书本地上传、上传类型由用户自己选择）
                 a. 选择证书组类型，即{{cert.type}}，(如果是CS_Admin,还需要选择CP_OP)，
-                b.（SECC-leaf-cert不作为上传选项）
+                
+                b.（SECC-leaf-cert、cp-leaf-cert不作为上传选项）
+                    在ocpp1.6中secc-leaf-cert证书应该是由《backend/doc/ocpp1.6/protocol/ocpp_1_6_ISO_15118_v10.pdf》协议中的3.1.1描述生成，定义为secc证书，用于car-device之前的TLS链接。
+                    在ocpp1.6中cp-leaf-cert证书应该由《backend/doc/ocpp1.6/protocol/OCPP 1.6 security whitepaper edition 3.pdf》A02部分描述生成，用于device-csms之前的tls链接使用.（此部分暂时没做实现）
+
+                    而在ocpp2.0.1协议中，放在一起处理，由相关报文中的CertificateSigningUseEnumType区分
+                    即TriggerMessage中MessageTriggerEnumType=SignChargingStationCertificate对应触发device请求CP-leaf-cert证书安装，MessageTriggerEnumType=SignV2GCertificate对应触发device请求SECC-leaf-cert证书安装; SignCertificate、CertificateSigned中certificateType=ChargingStationCertificate向CSMS请求CP-leaf-cert证书安装，certificateType=V2GCertificate向CSMS请求SECC-leaf-cert证书安装，
+
                 c. CPO-sub2、CPS-leaf、Contract-leaf必须同时上传证书和私钥，密码作为可选
+                
                 d. 后端不需要判断证书是否合法(因为可能会上传需要调试的错误证书)，只需解析相关参数即可[SerialNumber、issuerName、Validity、SubjectName、SubjectPublicKey、SignatureAlgorithm]，
                     然后将相关证书关参数和CP_OP.name、certType、owncontent、privatekeyContent、enabled、password一起存入数据库
                     CPO-sub2、CPS-leaf、Contract-leaf私钥不需要单独存入数据库，但是需要作为证书的相关参数和password放入数据库中
+                
                 e. 本地不存放证书文件和私钥文件，全部交由数据库管理
 
             前端证书显示
                 1.当用户进入此界面时，不需要立刻向后端请求证书显示，应该有Read button触发
                     --需要有证书筛选选项，选项有CP_OP.name(仅当CS_Admin用户登录显示)，证书类型{{cert.type}}
-                    --SECCLeaf证书为该CP_OP名下签发过的所有证书，
+                    --SECCLeaf证书为该CP_OP名下签发过的所有SECC-leaf-cert证书
+                    --CPLeaf为该CP_OP名下签发过的所有CP-leaf-cert证书，
                 2.显示的条目为证书名称、证书类型、证书所属的CP_OP.name, action,
                     --action包括check、delete
                     --action.check可以查看其对应的详细信息
                     --action.content可以查看其完整的内容
-                    --action.delete删除对应的证书文件、DB数据
+                    --action.delete删除对应的数据库中的数据
 
         2.3.4.3 devices
             能够实现设备的增删改查，
             基本参数有devicename、protocol、location、enable、heatbeatinterval，所属的CP_OM(仅由CP_OP、CS_Admin新建时需要选择)等
+            针对不同的protocol（ocpp1.6、ocpp2.0.1、ocpp2.1）需要做出如下区分
+            1.ocpp1.6需要用户设置connectorNo.个数1、2、3...，默认2
+            2.ocpp2.0.1和ocpp2.1需要用户设置evesNo.和connectorNo. evesNo.默认2，connectorNo.默认1
 
         2.3.4.4 Idtag
             支持新建、修改、删除idtag，
-            基本参数有有parentidtag，status（block、valid、expired），expirytime，
+            基本参数有有parentidtag，status（block、valid、expired），expirytime，type（用于ocpp2.0.1和ocpp2.1，类型描述在specification的3.43. IdTokenEnumType）
 
         2.3.4.5 profile
             支持导入智能充电配置文件，并支持重命名
@@ -275,32 +303,85 @@
 
     4.3 OCPP2.0.1相关功能描述
         schema在"backend/doc/ocpp2.0.1/schema/"
-        protocol文件在"backend/doc/ocpp2.0.1/protocol/specification"
+        protocol文件在"backend/doc/ocpp2.0.1/protocol/OCPP-2.0.1_edition4_part2_specification.pdf"
+        ocpp2.0.1中增加了evseid和connectorid的概念，参考"backend/doc/ocpp2.0.1/protocol/OCPP-2.0.1_edition4_part1_architecture_topology.pdf"
+
         1.Authorize
-            
+            ocpp2.0.1中将普通idtag的鉴权和PNC的合同证书+EMAID鉴权放到一起，其中合同证书的鉴权是可选项，当且仅当idtokentype.type=EMAID的时候需要处理
+            合同证书的鉴权需要certificate或者iso15118CertificateHashData，后端使用PKI证书库中的证书对合同证书的信息进行验证
+            针对IDtag的鉴权，后端查找数据库中的idtag table进行状态验证
+
         2.BootNotification
+            数据库中增加bootreason，显示在前端overview
+            其他与ocpp1.6处理类似
 
         3.Heartbeat
+            与ocpp1.6处理类似
 
         4.StatusNotification
+            需要处理evseid数据
 
         5.TransactionEvent
+            交易部分对比ocpp1.6改变巨大，将之前的starttransaction、stoptransaction、metervalue数据集成在一起
+            transactionid由device自生成，然后上传至平台。所以要考虑不同桩上报相同的transactionid，应该要deviceid+evseid+connectorid+transactionid才能绑定一笔交易
+            要求能够记录每条transactionevent数据，并能够将除了eventtype=MeterValueClock、MeterValuePeriodic的其他TransactionEvent数据显示在前端，eventtype=MeterValueClock、MeterValuePeriodic数据记录在log里面就行。
+
+            numberOfPhasesUsed、cableMaxCurrent参数不用管，没什么用
 
         6.NotifyReport
+            响应即可
 
         7.NotifyEvent
+            响应即可
 
         8.CertificateSigned
+            流程等同PNC4.2.9.1 参考specification A02
+            具体协议参考specification Message 1.4. 前后端需要考虑certificatetype
 
         9.DeleteCertificate
+            流程等同PNC4.2.9.3 参考specification M04
+            具体协议参考specification Message 1.14. 前后端需要考虑certificatetype
 
         10.Get15118EVCertificate
+            流程等同PNC4.2.9.5 参考specification M01&M02
+            具体协议参考specification Message 1.16. 前后端需要考虑certificatetype
 
         11.GetInstalledCertificateIds
+            流程等同PNC4.2.9.2 参考specification M03
+            具体协议参考specification Message 1.22. 前后端需要考虑certificatetype
 
         12.InstallCertificate
+            流程等同PNC4.2.9.4 参考specification M05
+            具体协议参考specification Message 1.30. 前后端需要考虑certificatetype
 
-        13.SignCertificate
+        13.SignCertificate 
+            cs上传csr和certificateType给csms，请求后端签发证书，应使用前端选择的PKI对此请求进行签发
+            流程等同PNC4.2.9.1, 参考specification A02
+            具体协议参考specification Message 1.58. 前后端需要考虑certificatetype
+
+        14.SecurityEventNotification
+            响应即可
+
+        15.GetVariables&SetVariables
+            GetVariables等同ocpp1.6的getconfiguration
+            SetVariables等同ocpp1.6的changeconfiguration
+            为了减少开发量，暂时在SetVariables中限制一些参数
+            attributeType=Actual 
+            attributeValue=实际设定值（即前端用户设置值）
+            其他数据按照specification中Part Referenced Components and Variables中Chapter 2. Referenced Components and Variables中的进行填写
+
+
+        16.RequestStartTransaction & RequestStopTransaction
+            等同OCPP1.6 4.2.7.1和4.2.7.2
+
+        17.Reset
+            支持远程启动
+
+
+        18.TriggerMessage
+            参考3.54. MessageTriggerEnumType，实现以下type
+            BootNotification、LogStatusNotification、FirmwareStatusNotification、Heartbeat、MeterValues、StatusNotification、TransactionEvent
+            SignChargingStationCertificate、SignV2GCertificate
 
 
 5. 数据库结构
@@ -311,6 +392,7 @@
     5.1 "role" 用户管理
     5.2 "action" 用户的操作权限以及相应API
     5.3 "transaction" 用户的交易数据
+        由于ocpp1.6和ocpp2.0.1数据结构差别太大，需要分成两个表
     5.4 "device" 设备管理
     5.5 "certificate" 证书管理
     5.6 "idtag"管理

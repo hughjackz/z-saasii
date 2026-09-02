@@ -21,6 +21,23 @@
         <div v-if="seccResult" :class="['result', seccResult.ok ? 'result-ok' : 'result-err']">{{ seccResult.message }}</div>
       </AppCard>
 
+      <!-- 1b. Install CP Leaf Certificate (OCPP201 only, README 2.3.2.4.a) -->
+      <AppCard v-if="ocpp2" title="1b. Install CP Leaf Certificate (OCPP 2.0.1)">
+        <p class="pnc-desc">Select V2G root + CPO sub1/sub2 as signer, then trigger device to request CP Leaf signing (ChargingStationCertificate).</p>
+        <label>V2G Root</label>
+        <select v-model="cpLeafForm.v2gRoot"><option value="">— select —</option><option v-for="c in certsByType('V2G-root-cert')" :key="c.id" :value="c.name">{{ c.name }}</option></select>
+        <label>CPO Sub1</label>
+        <select v-model="cpLeafForm.cpoSub1"><option value="">— select —</option><option v-for="c in certsByType('CPO-sub1-cert')" :key="c.id" :value="c.name">{{ c.name }}</option></select>
+        <label>CPO Sub2</label>
+        <select v-model="cpLeafForm.cpoSub2"><option value="">— select —</option><option v-for="c in certsByType('CPO-sub2-cert')" :key="c.id" :value="c.name">{{ c.name }}</option></select>
+        <div class="btn-row">
+          <AppButton variant="primary" :loading="cpLeafLoading" :disabled="!cpLeafForm.v2gRoot || !cpLeafForm.cpoSub1 || !cpLeafForm.cpoSub2" @click="doInstallCpLeaf">
+            <i class="ti ti-certificate-2"></i> Trigger CP Leaf Install
+          </AppButton>
+        </div>
+        <div v-if="cpLeafResult" :class="['result', cpLeafResult.ok ? 'result-ok' : 'result-err']">{{ cpLeafResult.message }}</div>
+      </AppCard>
+
       <!-- 2. Install Root Certificate -->
       <AppCard title="2. Install Root Certificate">
         <p class="pnc-desc">Select certificate type, then choose certificates to install on the device.</p>
@@ -55,10 +72,11 @@
           <option value="MO-root-cert">MO-root-cert</option>
           <option value="V2G-root-cert">V2G-root-cert</option>
           <option value="SECC-leaf-cert">SECC-leaf-cert</option>
+          <option v-if="ocpp2" value="CP-leaf-cert">CP-leaf-cert</option>
         </select>
         <div class="btn-row"><AppButton :loading="getLoading" @click="doGetCerts"><i class="ti ti-list"></i> Get Installed Certs</AppButton></div>
         <div v-if="installedCerts.length" class="cert-result">
-          <div v-for="c in installedCerts" :key="c.certificateHashData?.issuerNameHash + c.certificateType" class="cert-item">
+          <div v-for="c in installedCerts" :key="(c.certificateHashData?.issuerNameHash || '') + (c.certificateType || '') + (c.certificateHashData?.serialNumber || '')" class="cert-item">
             <i class="ti ti-certificate"></i>
             <div><strong>{{ c.certificateType }}</strong><br><small>{{ c.certificateHashData?.issuerNameHash || '—' }}</small></div>
           </div>
@@ -73,6 +91,7 @@
           <option value="MO-root-cert">MO-root-cert</option>
           <option value="V2G-root-cert">V2G-root-cert</option>
           <option value="SECC-leaf-cert">SECC-leaf-cert</option>
+          <option v-if="ocpp2" value="CP-leaf-cert">CP-leaf-cert</option>
         </select>
         <div v-if="delCertType && certsByType(delCertType).length" style="margin-top:10px">
           <label>Select certificates to delete</label>
@@ -118,6 +137,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { pnc, certs as certsApi } from '@/api/index.js'
 import { useGlobalDevice } from '@/composables/useGlobalDevice.js'
+import { isOcpp2 } from '@/stores/devices.js'
 import PageHeader from '@/components/PageHeader.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppButton from '@/components/AppButton.vue'
@@ -126,7 +146,9 @@ import DeviceBanner from '@/components/DeviceBanner.vue'
 const { device, deviceId } = useGlobalDevice()
 const libraryCerts = ref([])
 
-// All 13 uploadable types (exclude SECC-leaf-cert, which is auto-generated)
+const ocpp2 = computed(() => !!device.value && isOcpp2(device.value.protocol))
+
+// All 13 uploadable types (exclude SECC-leaf-cert / CP-leaf-cert, which are auto-generated)
 const contractCertTypes = [
   'V2G-root-cert', 'CPO-sub1-cert', 'CPO-sub2-cert',
   'CPS-sub1-cert', 'CPS-sub2-cert', 'CPS-leaf-cert',
@@ -141,6 +163,8 @@ const delCertType = ref('');     const delSelected = ref([]);    const delLoadin
 const installCertType = ref(''); const installSelected = ref([]); const installLoading = ref(false); const installResult = ref(null)
 const seccLoading = ref(false);  const seccResult = ref(null)
 const seccForm = ref({ v2gRoot: '', v2gSub1: '', v2gSub2: '' })
+const cpLeafLoading = ref(false); const cpLeafResult = ref(null)
+const cpLeafForm = ref({ v2gRoot: '', cpoSub1: '', cpoSub2: '' })
 
 // Contract cert group (Card 5)
 const contractGroup = ref({})
@@ -163,10 +187,20 @@ function onContractCertChange(type, name) {
 async function doInstallSeccLeaf() {
   seccLoading.value = true; seccResult.value = null
   try {
-    await pnc.signCertificate(deviceId.value, { ...seccForm.value })
+    await pnc.signCertificate(deviceId.value, { certificateType: 'SECC-leaf-cert', ...seccForm.value })
     seccResult.value = { ok: true, message: 'SECC Leaf signing triggered. Device will request certificate.' }
   } catch (e) { seccResult.value = { ok: false, message: e?.message || 'Error' } }
   finally { seccLoading.value = false }
+}
+
+// 1b. Install CP Leaf (OCPP201 only)
+async function doInstallCpLeaf() {
+  cpLeafLoading.value = true; cpLeafResult.value = null
+  try {
+    await pnc.signCertificate(deviceId.value, { certificateType: 'CP-leaf-cert', ...cpLeafForm.value })
+    cpLeafResult.value = { ok: true, message: 'CP Leaf signing triggered. Device will request certificate (SignChargingStationCertificate).' }
+  } catch (e) { cpLeafResult.value = { ok: false, message: e?.message || 'Error' } }
+  finally { cpLeafLoading.value = false }
 }
 
 // 2. Install Root Certificate
@@ -187,8 +221,7 @@ async function doGetCerts() {
   try {
     const res = await pnc.getInstalledCerts(deviceId.value, getCertType.value || undefined)
     installedCerts.value = res?.certificateHashDataChain || (Array.isArray(res) ? res : [])
-  }
-  finally { getLoading.value = false }
+  } finally { getLoading.value = false }
 }
 
 // 4. Delete Certificate
@@ -196,7 +229,7 @@ async function doDelete() {
   delLoading.value = true; delResult.value = null
   try {
     for (const name of delSelected.value) {
-      await pnc.deleteCert(deviceId.value, name)
+      await pnc.deleteCert(deviceId.value, name, delCertType.value)
     }
     delResult.value = { ok: true, message: `${delSelected.value.length} certificate(s) deleted.` }
     delSelected.value = []

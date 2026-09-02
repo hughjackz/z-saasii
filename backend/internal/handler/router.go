@@ -62,6 +62,7 @@ func NewRouter(hub *ws.Hub) *gin.Engine {
 		// Transactions
 		ocppGroup.GET("/transactions", ocpp.GetTransactions)
 		ocppGroup.GET("/transactions/active", ocpp.GetActiveTransactions)
+		ocppGroup.GET("/transaction-events", ocpp.GetTransactionEvents)
 		ocppGroup.POST("/remote-start", ocpp.RemoteStart)
 		ocppGroup.POST("/remote-stop", ocpp.RemoteStop)
 

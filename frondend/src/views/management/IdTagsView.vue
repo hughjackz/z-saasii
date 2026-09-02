@@ -21,12 +21,13 @@
     <div class="card-table">
       <table>
         <thead>
-          <tr><th>Tag ID</th><th>Parent Tag</th><th>Status</th><th>Expiry</th><th>Owner</th><th>Actions</th></tr>
+          <tr><th>Tag ID</th><th>Type</th><th>Parent Tag</th><th>Status</th><th>Expiry</th><th>Owner</th><th>Actions</th></tr>
         </thead>
         <tbody>
-          <tr v-if="loading"><td colspan="6" class="empty-cell">Loading…</td></tr>
+          <tr v-if="loading"><td colspan="7" class="empty-cell">Loading…</td></tr>
           <tr v-for="t in filtered" :key="t.id">
             <td><code>{{ t.tagId }}</code></td>
+            <td><code class="muted">{{ t.type || 'ISO14443' }}</code></td>
             <td><code v-if="t.parentTagId">{{ t.parentTagId }}</code><span v-else class="muted">—</span></td>
             <td><AppBadge :color="statusColor(t.status)">{{ t.status }}</AppBadge></td>
             <td>{{ t.expiryTime ? fmtDate(t.expiryTime) : '—' }}</td>
@@ -38,7 +39,7 @@
               </div>
             </td>
           </tr>
-          <tr v-if="!loading && !filtered.length"><td colspan="6" class="empty-cell">No ID tags found.</td></tr>
+          <tr v-if="!loading && !filtered.length"><td colspan="7" class="empty-cell">No ID tags found.</td></tr>
         </tbody>
       </table>
     </div>
@@ -60,6 +61,12 @@
         <div>
           <label>Parent Tag ID</label>
           <input v-model="form.parentTagId" placeholder="Optional parent tag" />
+        </div>
+        <div>
+          <label>Type</label>
+          <select v-model="form.type">
+            <option v-for="t in idTokenTypes" :key="t" :value="t">{{ t }}</option>
+          </select>
         </div>
         <div>
           <label>Status</label>
@@ -112,6 +119,12 @@ const showConfirm = ref(false)
 const delTarget = ref(null)
 const deleting = ref(false)
 
+// IdTokenEnumType (OCPP 2.0.1 specification 3.43, README 2.3.4.4)
+const idTokenTypes = [
+  'Central', 'eMAID', 'ISO14443', 'ISO15693',
+  'KeyCode', 'Local', 'MacAddress', 'NoAuthorization'
+]
+
 const filtered = computed(() => {
   let l = list.value
   if (statusFilter.value) l = l.filter(t => t.status === statusFilter.value)
@@ -127,13 +140,13 @@ function getTenantId() { return auth.isCSAdmin ? selectedTenant.value : (auth.te
 
 function openCreate() {
   editing.value = null
-  form.value = { tagId: '', parentTagId: '', status: 'Valid', expiryTime: '', tenantId: getTenantId() }
+  form.value = { tagId: '', parentTagId: '', type: 'ISO14443', status: 'Valid', expiryTime: '', tenantId: getTenantId() }
   showForm.value = true
 }
 function openEdit(t) {
   editing.value = t
   const exp = t.expiryTime ? new Date(t.expiryTime).toISOString().slice(0, 16) : ''
-  form.value = { ...t, expiryTime: exp }
+  form.value = { ...t, type: t.type || 'ISO14443', expiryTime: exp }
   showForm.value = true
 }
 function confirmDel(t) { delTarget.value = t; showConfirm.value = true }

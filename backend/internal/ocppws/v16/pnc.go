@@ -235,9 +235,11 @@ type pncAuthorizeReq struct {
 	} `json:"iso15118CertificateHashData"`
 }
 
-// validateCertChain validates a PEM certificate chain by parsing it, finding the
-// issuer in the database, and verifying the signature.
-func validateCertChain(certPEM string) string {
+// ValidateCertChain validates a PEM certificate chain by parsing it, finding the
+// issuer in the database (PKI certificate library), and verifying the signature.
+// Returns the OCPP certificateStatus value. Also used by OCPP 2.0.1 Authorize
+// for eMAID contract-certificate validation (README 4.3.1).
+func ValidateCertChain(certPEM string) string {
 	block, _ := pem.Decode([]byte(certPEM))
 	if block == nil {
 		return "SignatureError"
@@ -314,7 +316,7 @@ func handlePNCAuthorize(dc *ocppws.DeviceConnection, call *ocppws.CallMessage, e
 	// certificate and iso15118CertificateHashData are mutually exclusive (2选1)
 	if req.Certificate != "" {
 		// Option 1: PEM certificate chain — parse, find issuer in DB, validate
-		certStatus = validateCertChain(req.Certificate)
+		certStatus = ValidateCertChain(req.Certificate)
 	} else if len(req.ISO15118CertificateHashData) > 0 {
 		// Option 2: hash data — look up issuer by hash in DB
 		certStatus = "NoCertificateAvailable"

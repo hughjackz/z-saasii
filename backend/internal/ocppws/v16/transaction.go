@@ -94,7 +94,7 @@ func handleStopTransaction(dc *ocppws.DeviceConnection, call *ocppws.CallMessage
 	}
 
 	_, _ = repository.DB.Exec(
-		`UPDATE transaction SET stop_time=?, stop_meter=?, stop_reason=?, active=0, updated_at=NOW()
+		`UPDATE transaction SET stop_time=?, stop_meter=?, stop_reason=?, active=0
 		 WHERE transaction_id=? AND charge_point_id=? AND tenant_id=? AND active=1`,
 		stopTime, req.MeterStop, req.Reason, req.TransactionID, dc.DeviceName, dc.TenantID)
 

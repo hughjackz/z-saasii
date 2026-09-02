@@ -61,6 +61,40 @@
           <div class="dev-meta-item">Last seen<br><strong>{{ d.lastHeartbeat ? dayjs(d.lastHeartbeat).fromNow() : '—' }}</strong></div>
           <div class="dev-meta-item">Owner<br><strong>{{ d.ownerName ?? '—' }}</strong></div>
         </div>
+
+        <!-- Per-connector / per-EVSE status (README 2.3.1) -->
+        <div class="conn-grid" @click.stop>
+          <template v-if="isOcpp2Device(d)">
+            <div v-if="d.bootReason" class="boot-chip" title="Last boot reason">
+              <i class="ti ti-power"></i> {{ d.bootReason }}
+            </div>
+            <div v-for="evse in evseList(d)" :key="'evse-'+evse" class="conn-evse">
+              <span class="conn-evse-label">EVSE {{ evse }}</span>
+              <div class="conn-row">
+                <span
+                  v-for="c in connectorList(d)"
+                  :key="'c-'+evse+'-'+c"
+                  :class="['conn-chip', statusTone(connectorStatus(d, evse, c))]"
+                  :title="`EVSE ${evse} / Connector ${c}`"
+                >
+                  C{{ c }} · {{ connectorStatus(d, evse, c) }}
+                </span>
+              </div>
+            </div>
+          </template>
+          <template v-else>
+            <div class="conn-row">
+              <span
+                v-for="c in connectorList(d)"
+                :key="'c-'+c"
+                :class="['conn-chip', statusTone(connectorStatus(d, 0, c))]"
+                :title="`Connector ${c}`"
+              >
+                C{{ c }} · {{ connectorStatus(d, 0, c) }}
+              </span>
+            </div>
+          </template>
+        </div>
       </div>
     </div>
   </div>
@@ -91,6 +125,37 @@ const loading = ref(false)
 const onlineCount = computed(() => deviceList.value.filter(d => d.online).length)
 const activeCount = computed(() => deviceList.value.reduce((s, d) => s + (d.activeTx || 0), 0))
 const faultedCount = computed(() => deviceList.value.filter(d => d.status === 'Faulted').length)
+
+// ── Connector / EVSE status helpers (README 2.3.1) ─────────────────────────
+function isOcpp2Device(d) { return isOcpp2(d.protocol) }
+
+// OCPP 1.6: connectors 1..connectorNo (default 2)
+// OCPP 2.x: connectors 1..connectorNo (default 1) within each EVSE
+function connectorList(d) {
+  const n = d.connectorNo > 0 ? d.connectorNo : (isOcpp2Device(d) ? 1 : 2)
+  return Array.from({ length: n }, (_, i) => i + 1)
+}
+
+// OCPP 2.x: EVSEs 1..evseNo (default 2)
+function evseList(d) {
+  const n = d.evseNo > 0 ? d.evseNo : 2
+  return Array.from({ length: n }, (_, i) => i + 1)
+}
+
+function connectorStatus(d, evseId, connectorId) {
+  const s = (d.connectorStatuses || []).find(
+    cs => cs.evseId === evseId && cs.connectorId === connectorId
+  )
+  return s ? s.status : (d.online ? 'Unknown' : 'Offline')
+}
+
+function statusTone(status) {
+  if (status === 'Offline') return 'tone-offline'
+  if (status === 'Available') return 'tone-ok'
+  if (status === 'Occupied' || status === 'Reserved' || status === 'Charging') return 'tone-busy'
+  if (status === 'Faulted') return 'tone-fault'
+  return 'tone-unknown'
+}
 
 async function fetchDevices() {
   loading.value = true
@@ -156,4 +221,25 @@ onMounted(fetchDevices)
 .dot-gray  { background: #888; }
 .spin { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Connector / EVSE status chips */
+.conn-grid { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.conn-row { display: flex; flex-wrap: wrap; gap: 5px; }
+.conn-evse { display: flex; flex-direction: column; gap: 3px; }
+.conn-evse-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; }
+.conn-chip {
+  font-size: 10.5px; padding: 2px 8px; border-radius: 10px;
+  border: 0.5px solid var(--border-md); background: var(--bg); color: var(--text2);
+  white-space: nowrap;
+}
+.boot-chip {
+  display: inline-flex; align-items: center; gap: 5px; align-self: flex-start;
+  font-size: 10.5px; padding: 2px 8px; border-radius: 10px;
+  border: 0.5px solid var(--border-md); background: var(--bg); color: var(--text2);
+}
+.tone-ok { color: #1a6b4a; background: #e8f5ee; border-color: #bde3d0; }
+.tone-busy { color: #8a5a00; background: #fdf3dd; border-color: #f0dcb2; }
+.tone-fault { color: #a32d2d; background: #fcebeb; border-color: #f2c9c9; }
+.tone-offline { color: var(--text3); background: var(--bg); }
+.tone-unknown { color: var(--text2); }
 </style>
