@@ -214,6 +214,11 @@ func (s *Server) handleConnection(w http.ResponseWriter, r *http.Request, ocppVe
 	s.hub.Register(dc)
 
 	// Push the device-reported status from the DB to the frontend (README 4.1).
+	// If the device was marked offline by a past disconnect, reflect that it is
+	// back online until it reports its own status (boot/status notification).
+	if device.Status == "Offline" || device.Status == "" {
+		_ = repository.UpdateDeviceStatus(device.Name, "Available")
+	}
 	s.emitEvent("info", dc.TenantID, dc.DeviceName, "Device connected (status="+device.Status+")")
 
 	go s.writePump(dc)

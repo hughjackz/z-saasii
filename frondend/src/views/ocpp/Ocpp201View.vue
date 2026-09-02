@@ -150,7 +150,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import dayjs from 'dayjs'
 import { transactions, devices as devicesApi } from '@/api/index.js'
 import { useGlobalDevice } from '@/composables/useGlobalDevice.js'
@@ -169,6 +169,7 @@ const active = ref([])
 const history = ref([])
 const txEvents = ref([])
 const loading = ref(false)
+let pollTimer
 
 const connectorList = computed(() => {
   const n = deviceInfo.value?.connectorNo > 0 ? deviceInfo.value.connectorNo : 1
@@ -232,8 +233,25 @@ async function refresh() {
   }
 }
 
-onMounted(refresh)
+onMounted(() => {
+  refresh()
+  // Live status: poll so connection/connector status reflects the device
+  // without a manual Refresh (README 4.1).
+  pollTimer = setInterval(refresh, 30000)
+})
 watch(deviceId, refresh)
+onUnmounted(() => clearInterval(pollTimer))
+
+// Auto-refresh when device-related events arrive so live connection status /
+// connector status update without pressing Refresh (README 4.1).
+let refreshTimer
+watch(() => eventsStore.logs.length, () => {
+  if (refreshTimer) return
+  refreshTimer = setTimeout(() => {
+    refreshTimer = null
+    refresh()
+  }, 2000)
+})
 </script>
 
 <style scoped>

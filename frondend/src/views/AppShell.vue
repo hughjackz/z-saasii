@@ -43,30 +43,29 @@
 
       <div v-if="hasAnyOcpp" class="nav-section">
         <div class="nav-label">OCPP</div>
-        <template>
-          <RouterLink v-if="auth.hasPermission('ocpp.configuration')" to="/ocpp/configuration" class="nav-item" active-class="active">
-            <i class="ti ti-settings"></i> Configuration
-          </RouterLink>
-          <RouterLink v-if="auth.hasPermission('ocpp.transaction')" to="/ocpp/transactions" class="nav-item" active-class="active">
-            <i class="ti ti-receipt"></i> Transactions
-          </RouterLink>
-          <RouterLink v-if="auth.hasPermission('ocpp.action')" to="/ocpp/actions" class="nav-item" active-class="active">
-            <i class="ti ti-player-play"></i> Actions
-          </RouterLink>
-          <RouterLink v-if="auth.hasPermission('ocpp.maintenance')" to="/ocpp/maintenance" class="nav-item" active-class="active">
-            <i class="ti ti-tool"></i> Maintenance
-          </RouterLink>
-          <RouterLink v-if="auth.hasPermission('ocpp.pnc')" to="/ocpp/pnc" class="nav-item" active-class="active">
-            <i class="ti ti-certificate"></i> PnC
-          </RouterLink>
-          <RouterLink v-if="auth.hasPermission('ocpp.smartcharging')" to="/ocpp/smart-charging" class="nav-item" active-class="active">
-            <i class="ti ti-bolt"></i> Smart Charging
-          </RouterLink>
-          <!-- OCPP 2.x devices get the 2.0.1 console in addition (README 2.3.1) -->
-          <RouterLink v-if="ocpp2Selected && auth.hasPermission('ocpp.ocpp201')" to="/ocpp/ocpp201" class="nav-item" active-class="active">
-            <i class="ti ti-terminal-2"></i> OCPP 2.0.1 Console
-          </RouterLink>
-        </template>
+        <!-- Modules are available for both OCPP 1.6 and 2.0.1 devices (README 2.3.2) -->
+        <RouterLink v-if="auth.hasPermission('ocpp.configuration')" to="/ocpp/configuration" class="nav-item" active-class="active">
+          <i class="ti ti-settings"></i> Configuration
+        </RouterLink>
+        <RouterLink v-if="auth.hasPermission('ocpp.transaction')" to="/ocpp/transactions" class="nav-item" active-class="active">
+          <i class="ti ti-receipt"></i> Transactions
+        </RouterLink>
+        <RouterLink v-if="auth.hasPermission('ocpp.action')" to="/ocpp/actions" class="nav-item" active-class="active">
+          <i class="ti ti-player-play"></i> Actions
+        </RouterLink>
+        <RouterLink v-if="auth.hasPermission('ocpp.maintenance')" to="/ocpp/maintenance" class="nav-item" active-class="active">
+          <i class="ti ti-tool"></i> Maintenance
+        </RouterLink>
+        <RouterLink v-if="auth.hasPermission('ocpp.pnc')" to="/ocpp/pnc" class="nav-item" active-class="active">
+          <i class="ti ti-certificate"></i> PnC
+        </RouterLink>
+        <RouterLink v-if="auth.hasPermission('ocpp.smartcharging')" to="/ocpp/smart-charging" class="nav-item" active-class="active">
+          <i class="ti ti-bolt"></i> Smart Charging
+        </RouterLink>
+        <!-- OCPP 2.x devices get the 2.0.1 console in addition (README 2.3.1) -->
+        <RouterLink v-if="ocpp2Selected && auth.hasPermission('ocpp.ocpp201')" to="/ocpp/ocpp201" class="nav-item" active-class="active">
+          <i class="ti ti-terminal-2"></i> OCPP 2.0.1 Console
+        </RouterLink>
       </div>
 
       <div v-if="auth.hasPermission('vdv261')" class="nav-section">
