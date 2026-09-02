@@ -175,11 +175,11 @@ function onTenantChange(payload) {
   fetchDevices()
 }
 
-// Enter the device's operation interface, routed by OCPP protocol version
-// (README 2.3.1).
+// Enter the device's detail page after selecting it in Overview
+// (README 2.3.1: selecting a device jumps to detail).
 function openDevice(d) {
   devicesStore.select(d.id)
-  router.push(isOcpp2(d.protocol) ? '/ocpp/ocpp201' : '/ocpp/configuration')
+  router.push('/ocpp/detail')
 }
 
 // Lightweight auto-refresh when device-related events arrive on the WS hub.

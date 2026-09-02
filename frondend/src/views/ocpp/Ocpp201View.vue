@@ -1,6 +1,6 @@
 <template>
   <div>
-    <PageHeader title="OCPP 2.0.1 Console" subtitle="Overview for the selected OCPP 2.x charge point">
+    <PageHeader title="detail" subtitle="Device detail for the selected charge point">
       <template #actions>
         <AppButton :loading="loading" @click="refresh"><i class="ti ti-refresh"></i> Refresh</AppButton>
       </template>
@@ -21,30 +21,44 @@
       <div class="info-item"><label>Heartbeat Interval</label><strong>{{ deviceInfo?.heartbeatInterval }} s</strong></div>
       <div class="info-item"><label>Location</label><strong>{{ deviceInfo?.location || '—' }}</strong></div>
       <div class="info-item"><label>Owner</label><strong>{{ deviceInfo?.ownerName || '—' }}</strong></div>
-      <div class="info-item"><label>Topology</label><strong>{{ evseList.length }} EVSE × {{ connectorList.length }} conn</strong></div>
+      <div class="info-item"><label>Topology</label><strong>{{ topologyLabel }}</strong></div>
     </div>
 
-    <!-- EVSE / connector statuses (README 2.3.1) -->
+    <!-- Connector / EVSE statuses (README 2.3.1) -->
     <AppCard style="margin-bottom:14px;padding:0;overflow:hidden">
       <template #header>
         <div style="padding:10px 16px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:8px">
-          <span style="font-size:13px;font-weight:500">EVSE / Connector Status</span>
+          <span style="font-size:13px;font-weight:500">Connector Status</span>
         </div>
       </template>
       <div class="evse-list">
-        <div v-if="!evseList.length" style="text-align:center;color:var(--text3);padding:20px">No EVSE configured</div>
-        <div v-for="evse in evseList" :key="'evse-'+evse" class="evse-row">
-          <span class="evse-label">EVSE {{ evse }}</span>
-          <div class="conn-row">
-            <span
-              v-for="c in connectorList"
-              :key="'c-'+evse+'-'+c"
-              :class="['conn-chip', statusTone(connectorStatus(evse, c))]"
-            >
-              C{{ c }} · {{ connectorStatus(evse, c) }}
-            </span>
-          </div>
+        <!-- OCPP 1.6: flat connectors (evseId=0) -->
+        <div v-if="!ocpp2" class="conn-row" style="padding:8px 0">
+          <span
+            v-for="c in connectorList"
+            :key="'c-'+c"
+            :class="['conn-chip', statusTone(connectorStatus(0, c))]"
+            :title="`Connector ${c}`"
+          >
+            C{{ c }} · {{ connectorStatus(0, c) }}
+          </span>
         </div>
+        <!-- OCPP 2.x: EVSE × connector grid -->
+        <template v-else>
+          <div v-if="!evseList.length" style="text-align:center;color:var(--text3);padding:20px">No EVSE configured</div>
+          <div v-for="evse in evseList" :key="'evse-'+evse" class="evse-row">
+            <span class="evse-label">EVSE {{ evse }}</span>
+            <div class="conn-row">
+              <span
+                v-for="c in connectorList"
+                :key="'c-'+evse+'-'+c"
+                :class="['conn-chip', statusTone(connectorStatus(evse, c))]"
+              >
+                C{{ c }} · {{ connectorStatus(evse, c) }}
+              </span>
+            </div>
+          </div>
+        </template>
       </div>
     </AppCard>
 
@@ -72,9 +86,9 @@
       </table>
     </AppCard>
 
-    <!-- Transaction events (non-meter events are displayed; MeterValueClock /
-         MeterValuePeriodic go to the event log only — README 4.3.5) -->
-    <AppCard style="margin-bottom:14px;padding:0;overflow:hidden">
+    <!-- Transaction events (OCPP 2.x only: non-meter events are displayed;
+         MeterValueClock / MeterValuePeriodic go to the event log — README 4.3.5) -->
+    <AppCard v-if="ocpp2" style="margin-bottom:14px;padding:0;overflow:hidden">
       <template #header>
         <div style="padding:10px 16px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:8px">
           <span style="font-size:13px;font-weight:500">Transaction Events</span>
@@ -155,6 +169,7 @@ import dayjs from 'dayjs'
 import { transactions, devices as devicesApi } from '@/api/index.js'
 import { useGlobalDevice } from '@/composables/useGlobalDevice.js'
 import { useEventsStore } from '@/stores/events.js'
+import { isOcpp2 } from '@/stores/devices.js'
 import PageHeader from '@/components/PageHeader.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
@@ -172,12 +187,18 @@ const loading = ref(false)
 let pollTimer
 
 const connectorList = computed(() => {
-  const n = deviceInfo.value?.connectorNo > 0 ? deviceInfo.value.connectorNo : 1
+  const n = deviceInfo.value?.connectorNo > 0 ? deviceInfo.value.connectorNo : (ocpp2.value ? 1 : 2)
   return Array.from({ length: n }, (_, i) => i + 1)
 })
 const evseList = computed(() => {
   const n = deviceInfo.value?.evseNo > 0 ? deviceInfo.value.evseNo : 2
   return Array.from({ length: n }, (_, i) => i + 1)
+})
+const ocpp2 = computed(() => !!deviceInfo.value && isOcpp2(deviceInfo.value.protocol))
+const topologyLabel = computed(() => {
+  if (!deviceInfo.value) return '—'
+  if (ocpp2.value) return `${evseList.value.length} EVSE × ${connectorList.value.length} conn`
+  return `${connectorList.value.length} connectors`
 })
 
 function connectorStatus(evseId, connectorId) {

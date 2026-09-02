@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.js'
-import { useDevicesStore, isOcpp2 } from '@/stores/devices.js'
 
 const routes = [
   { path: '/login', name: 'Login', component: () => import('@/views/LoginView.vue'), meta: { public: true } },
@@ -17,7 +16,7 @@ const routes = [
       { path: 'ocpp/maintenance', name: 'OcppMaintenance', component: () => import('@/views/ocpp/MaintenanceView.vue'), meta: { module: 'ocpp.maintenance', title: 'Maintenance' } },
       { path: 'ocpp/pnc', name: 'OcppPnC', component: () => import('@/views/ocpp/PnCView.vue'), meta: { module: 'ocpp.pnc', title: 'PnC' } },
       { path: 'ocpp/smart-charging', name: 'OcppSmartCharging', component: () => import('@/views/ocpp/SmartChargingView.vue'), meta: { module: 'ocpp.smartcharging', title: 'Smart Charging' } },
-      { path: 'ocpp/ocpp201', name: 'Ocpp201', component: () => import('@/views/ocpp/Ocpp201View.vue'), meta: { module: 'ocpp.ocpp201', title: 'OCPP 2.0.1 Console' } },
+      { path: 'ocpp/detail', name: 'OcppDetail', component: () => import('@/views/ocpp/Ocpp201View.vue'), meta: { title: 'detail' } },
       { path: 'vdv261', name: 'VDV261', component: () => import('@/views/VDV261View.vue'), meta: { module: 'vdv261', title: 'VDV 261' } },
       { path: 'management/users', name: 'Users', component: () => import('@/views/management/UsersView.vue'), meta: { module: 'management.users', title: 'Users' } },
       { path: 'management/certificates', name: 'Certificates', component: () => import('@/views/management/CertificatesView.vue'), meta: { module: 'management.certificates', title: 'Certificates' } },
@@ -42,14 +41,5 @@ router.beforeEach((to) => {
   // Skip permission check until user data is loaded (fetchMe completes)
   if (!auth.loaded) return
   if (to.meta.module && !auth.hasPermission(to.meta.module)) return '/overview'
-
-  // Protocol-aware routing (README 2.3.1): the 2.0.1 console only applies to
-  // OCPP 2.x devices; OCPP 1.6 devices fall back to the shared Configuration
-  // page. Configuration/Transactions/Actions/Maintenance/PnC are available
-  // for BOTH protocols (README 2.3.2) with protocol-specific data formats.
-  const devices = useDevicesStore()
-  if (to.path === '/ocpp/ocpp201' && devices.current && !isOcpp2(devices.current.protocol)) {
-    return '/ocpp/configuration'
-  }
 })
 export default router
