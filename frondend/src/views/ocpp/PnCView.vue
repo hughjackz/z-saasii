@@ -87,8 +87,8 @@
                 <dt>issuerKeyHash</dt><dd>{{ c.certificateHashData?.issuerKeyHash || '—' }}</dd>
                 <dt>serialNumber</dt><dd>{{ c.certificateHashData?.serialNumber || '—' }}</dd>
               </dl>
-              <div v-if="c.childCertificateHashData?.length" class="child-hashes">
-                <div v-for="(ch, i) in c.childCertificateHashData" :key="'child-' + i" class="child-hash">
+              <div v-if="childHashList(c).length" class="child-hashes">
+                <div v-for="(ch, i) in childHashList(c)" :key="'child-' + i" class="child-hash">
                   <small>child {{ i + 1 }} — {{ ch.hashAlgorithm }} / {{ ch.issuerNameHash }} / {{ ch.issuerKeyHash }} / {{ ch.serialNumber }}</small>
                 </div>
               </div>
@@ -241,6 +241,14 @@ async function doGetCerts() {
     installedStatus.value = res?.status || ''
     installedCerts.value = res?.certificateHashDataChain || (Array.isArray(res) ? res : [])
   } finally { getLoading.value = false }
+}
+
+// Normalize childCertificateHashData: the spec says array, but some devices
+// send a single object. Return a consistent array for display.
+function childHashList(c) {
+  const ch = c?.childCertificateHashData
+  if (!ch) return []
+  return Array.isArray(ch) ? ch : [ch]
 }
 
 // Delete a single installed certificate using the hash data returned by the device.
