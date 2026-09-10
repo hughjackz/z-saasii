@@ -75,10 +75,27 @@
           <option v-if="ocpp2" value="CP-leaf-cert">CP-leaf-cert</option>
         </select>
         <div class="btn-row"><AppButton :loading="getLoading" @click="doGetCerts"><i class="ti ti-list"></i> Get Installed Certs</AppButton></div>
-        <div v-if="installedCerts.length" class="cert-result">
-          <div v-for="c in installedCerts" :key="(c.certificateHashData?.issuerNameHash || '') + (c.certificateType || '') + (c.certificateHashData?.serialNumber || '')" class="cert-item">
+        <div v-if="installedStatus || installedCerts.length" class="cert-result">
+          <div v-if="installedStatus" class="cert-status">Status: <strong>{{ installedStatus }}</strong></div>
+          <div v-for="(c, idx) in installedCerts" :key="'installed-' + idx" class="cert-item">
             <i class="ti ti-certificate"></i>
-            <div><strong>{{ c.certificateType }}</strong><br><small>{{ c.certificateHashData?.issuerNameHash || '—' }}</small></div>
+            <div class="cert-info">
+              <strong>{{ c.certificateType || '—' }}</strong>
+              <dl class="hash-grid">
+                <dt>hashAlgorithm</dt><dd>{{ c.certificateHashData?.hashAlgorithm || '—' }}</dd>
+                <dt>issuerNameHash</dt><dd>{{ c.certificateHashData?.issuerNameHash || '—' }}</dd>
+                <dt>issuerKeyHash</dt><dd>{{ c.certificateHashData?.issuerKeyHash || '—' }}</dd>
+                <dt>serialNumber</dt><dd>{{ c.certificateHashData?.serialNumber || '—' }}</dd>
+              </dl>
+              <div v-if="c.childCertificateHashData?.length" class="child-hashes">
+                <div v-for="(ch, i) in c.childCertificateHashData" :key="'child-' + i" class="child-hash">
+                  <small>child {{ i + 1 }} — {{ ch.hashAlgorithm }} / {{ ch.issuerNameHash }} / {{ ch.issuerKeyHash }} / {{ ch.serialNumber }}</small>
+                </div>
+              </div>
+            </div>
+            <AppButton size="sm" variant="danger" :loading="deletingIdx === idx" @click="deleteInstalledCert(c, idx)">
+              <i class="ti ti-trash"></i> Delete
+            </AppButton>
           </div>
         </div>
       </AppCard>
@@ -159,6 +176,7 @@ const contractCertTypes = [
 
 // Operation states
 const getCertType = ref('');     const installedCerts = ref([]); const getLoading = ref(false)
+const installedStatus = ref(''); const deletingIdx = ref(-1)
 const delCertType = ref('');     const delSelected = ref([]);    const delLoading = ref(false); const delResult = ref(null)
 const installCertType = ref(''); const installSelected = ref([]); const installLoading = ref(false); const installResult = ref(null)
 const seccLoading = ref(false);  const seccResult = ref(null)
@@ -220,8 +238,23 @@ async function doGetCerts() {
   if (!deviceId.value) return; getLoading.value = true
   try {
     const res = await pnc.getInstalledCerts(deviceId.value, getCertType.value || undefined)
+    installedStatus.value = res?.status || ''
     installedCerts.value = res?.certificateHashDataChain || (Array.isArray(res) ? res : [])
   } finally { getLoading.value = false }
+}
+
+// Delete a single installed certificate using the hash data returned by the device.
+async function deleteInstalledCert(c, idx) {
+  if (!deviceId.value || !c?.certificateHashData) return
+  deletingIdx.value = idx
+  try {
+    await pnc.deleteCertByHashData(deviceId.value, c.certificateHashData)
+    await doGetCerts()
+  } catch (e) {
+    alert(e?.message || 'Delete failed')
+  } finally {
+    deletingIdx.value = -1
+  }
 }
 
 // 4. Delete Certificate
@@ -261,6 +294,14 @@ onMounted(async () => {
 .cert-item { display: flex; align-items: flex-start; gap: 8px; padding: 8px; background: var(--bg); border-radius: var(--radius); font-size: 12px; }
 .cert-item i { font-size: 16px; color: var(--accent); margin-top: 1px; }
 .cert-item small { color: var(--text3); font-family: monospace; }
+.cert-status { font-size: 12px; color: var(--text2); padding: 4px 0; }
+.cert-info { flex: 1; min-width: 0; }
+.hash-grid { display: grid; grid-template-columns: 110px 1fr; gap: 2px 8px; margin: 4px 0 0; font-size: 11px; }
+.hash-grid dt { color: var(--text2); font-weight: 500; text-align: right; }
+.hash-grid dd { margin: 0; font-family: monospace; word-break: break-all; color: var(--text3); }
+.child-hashes { margin-top: 4px; }
+.child-hash { padding: 2px 0; }
+.child-hash small { word-break: break-all; }
 .multi-list { max-height: 160px; overflow-y: auto; border: 0.5px solid var(--border); border-radius: var(--radius); padding: 6px; }
 .multi-item { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 4px; font-size: 13px; cursor: pointer; }
 .multi-item:hover { background: var(--bg); }

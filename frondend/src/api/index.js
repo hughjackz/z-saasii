@@ -81,6 +81,8 @@ export const pnc = {
   getInstalledCerts: (deviceId, type) =>
     http.post(`/ocpp/${deviceId}/get-installed-certificate-ids`, { certificateType: type }),
   deleteCert: (deviceId, certName, certType) => http.post(`/ocpp/${deviceId}/delete-certificate`, { certName, certType }),
+  deleteCertByHashData: (deviceId, certificateHashData) =>
+    http.post(`/ocpp/${deviceId}/delete-certificate`, { certificateHashData }),
   installCert: (deviceId, certNames, certType) =>
     http.post(`/ocpp/${deviceId}/install-certificate`, { certNames, certType }),
   triggerCsr: deviceId => http.post(`/ocpp/${deviceId}/trigger-message`, { requestedMessage: 'SignCertificate' }),

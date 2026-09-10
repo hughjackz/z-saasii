@@ -437,4 +437,6 @@
     ./run.sh stop     # 停止（优雅退出，后端走 graceful shutdown）
     ./run.sh restart  # 重启
 
-2. 
+2. 证书签发后，没有计算相应的数据（issuerkeyhash）保存到数据库中
+3. Get Installed Certificates部分，在得到device的恢复后，将回复的所有信息显示出来，每个证书应该增加一个delete按钮，对应deletecertificate功能，允许对单个证书进行删除，
+4. CertificateSignedRequest报文中的certificateType的数据类型是CertificateSigningUseEnumType，包括ChargingStationCertificate 和 V2GCertificate，和triggermessage的SignChargingStationCertificate、SignV2GCertificate不同

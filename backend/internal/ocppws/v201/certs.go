@@ -28,6 +28,21 @@ func leafTypeForCertificateType(certificateType string) string {
 	return "SECC-leaf-cert"
 }
 
+// normalizeCertificateSigningUse maps a certificateType to a valid
+// CertificateSigningUseEnumType value used in SignCertificateRequest and echoed
+// in CertificateSignedRequest: "ChargingStationCertificate" or "V2GCertificate".
+// These are distinct from the TriggerMessage MessageTriggerEnumType values
+// ("SignChargingStationCertificate" / "SignV2GCertificate").
+func normalizeCertificateSigningUse(certificateType string) string {
+	switch certificateType {
+	case "ChargingStationCertificate":
+		return "ChargingStationCertificate"
+	default:
+		// "V2GCertificate", empty (omitted), or unknown → V2G leaf
+		return "V2GCertificate"
+	}
+}
+
 // ─── CertificateSigned (device confirms receiving the cert) ────────────────
 // Schema: CertificateSignedResponse.json — requires status.
 
@@ -193,7 +208,8 @@ func handleSignCertificate(dc *ocppws.DeviceConnection, call *ocppws.CallMessage
 		return
 	}
 
-	leafType := leafTypeForCertificateType(req.CertificateType)
+	certificateType := normalizeCertificateSigningUse(req.CertificateType)
+	leafType := leafTypeForCertificateType(certificateType)
 	session := v16.GetSECCSession(dc.DeviceID)
 	if session == nil {
 		log.Printf("[ocppws/v201] SignCertificate from %s but no pending signing session", dc.DeviceName)
@@ -201,7 +217,7 @@ func handleSignCertificate(dc *ocppws.DeviceConnection, call *ocppws.CallMessage
 		return
 	}
 
-	log.Printf("[ocppws/v201] Signing %s for %s (certificateType=%s)", leafType, dc.DeviceName, req.CertificateType)
+	log.Printf("[ocppws/v201] Signing %s for %s (certificateType=%s)", leafType, dc.DeviceName, certificateType)
 
 	signedCert, err := v16.SignLeafCSR(req.CSR, dc.DeviceName, dc.TenantID, session, leafType)
 	if err != nil {
@@ -229,11 +245,11 @@ func handleSignCertificate(dc *ocppws.DeviceConnection, call *ocppws.CallMessage
 	sendResult(dc, call.MsgID, map[string]string{"status": "Accepted"})
 
 	certSignedCall, _ := ocppws.BuildCall(uuid.New().String(), "CertificateSigned",
-		map[string]string{"certificateType": req.CertificateType, "certificateChain": certChain})
+		map[string]string{"certificateType": certificateType, "certificateChain": certChain})
 	dc.WriteCh <- certSignedCall
 
 	pushEvent(eventCh, dc.TenantID, "info", dc.DeviceName,
-		leafType+" signed and sent to device (2.0.1, certificateType="+req.CertificateType+")")
+		leafType+" signed and sent to device (2.0.1, certificateType="+certificateType+")")
 }
 
 // findCertContent looks up a certificate's PEM content from the DB by name.

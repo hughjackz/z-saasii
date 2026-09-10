@@ -12,7 +12,9 @@ import (
 	"crypto/cipher"
 	"crypto/md5"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/x509"
+	"encoding/asn1"
 	"encoding/hex"
 	"encoding/pem"
 	"fmt"
@@ -187,6 +189,22 @@ func SignLeafCSR(csrPEM, deviceName, tenantID string, sp *seccPending, leafType 
 		return "", fmt.Errorf("certificate signing failed: %w", err)
 	}
 
+	// 5b. Compute the certificate hash data (hashAlgorithm / issuerNameHash /
+	// issuerKeyHash) and persist it so DeleteCertificate and
+	// GetInstalledCertificateIds can reference the signed certificate
+	// (README 4.2.9.1 note 2). Same derivation as handler.UploadCertificate:
+	// SHA-256 over the DER-encoded issuer name and over the BIT STRING value
+	// of the SubjectPublicKeyInfo.
+	signedCert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		return "", fmt.Errorf("parse signed certificate: %w", err)
+	}
+	hashAlgorithm := "SHA256"
+	ih := sha256.Sum256(signedCert.RawIssuer)
+	issuerNameHash := hex.EncodeToString(ih[:])
+	kh := sha256.Sum256(extractSPKIBitString(signedCert.RawSubjectPublicKeyInfo))
+	issuerKeyHash := hex.EncodeToString(kh[:])
+
 	signedPEM := string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER}))
 
 	fileName := fmt.Sprintf("%s_%s_%d.pem", deviceName, fileNamePrefix, serialNo)
@@ -198,13 +216,16 @@ func SignLeafCSR(csrPEM, deviceName, tenantID string, sp *seccPending, leafType 
 		Name:               fileName,
 		CertGroup:          deviceName,
 		Type:               leafType,
-		Content:        signedPEM,
-		PrivateKey:     "", // SECC Leaf private key stays on device
+		Content:            signedPEM,
+		PrivateKey:         "", // SECC Leaf private key stays on device
 		SerialNumber:       fmt.Sprintf("%X", serialNo),
-		IssuerName:         issuerCert.Issuer.String(),
+		IssuerName:         issuerCert.Subject.String(),
 		SubjectName:        csr.Subject.String(),
 		PublicKey:          string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: csr.RawSubjectPublicKeyInfo})),
 		SignatureAlgorithm: issuerCert.SignatureAlgorithm.String(),
+		HashAlgorithm:      hashAlgorithm,
+		IssuerNameHash:     issuerNameHash,
+		IssuerKeyHash:      issuerKeyHash,
 		ValidFrom:          &notBefore,
 		ValidTo:            &notAfter,
 		Enabled:            true,
@@ -216,6 +237,20 @@ func SignLeafCSR(csrPEM, deviceName, tenantID string, sp *seccPending, leafType 
 	}
 
 	return signedPEM, nil
+}
+
+// extractSPKIBitString extracts the raw key bytes from a DER-encoded
+// SubjectPublicKeyInfo, stripping the SEQUENCE wrapper and BITSTRING tag/length.
+// Used to compute issuerKeyHash per OCPP 1.6 Security Whitepaper §6.1 / RFC 6960.
+func extractSPKIBitString(spki []byte) []byte {
+	var inner struct {
+		Algorithm asn1.RawValue
+		PublicKey asn1.BitString
+	}
+	if _, err := asn1.Unmarshal(spki, &inner); err != nil {
+		return spki
+	}
+	return inner.PublicKey.Bytes
 }
 
 // decryptPEM decrypts an encrypted PEM block using the legacy OpenSSL format

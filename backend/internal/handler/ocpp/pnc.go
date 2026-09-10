@@ -117,43 +117,57 @@ func GetInstalledCertificateIds(c *gin.Context) {
 // POST /api/ocpp/:deviceId/delete-certificate
 // Looks up the certificate in the DB to get hash data, then sends a
 // DeleteCertificate request to the device (README 4.2.9.3 / 4.3.9).
-// Body: {certName, certType?}
+// Body: {certName, certType?} OR {certificateHashData: {...}}.
+// The certificateHashData form lets the frontend delete an installed
+// certificate directly from the GetInstalledCertificateIds response.
 func DeleteCertificateOnDevice(c *gin.Context) {
 	var req struct {
-		CertName string `json:"certName"`
-		CertType string `json:"certType"`
+		CertName            string            `json:"certName"`
+		CertType            string            `json:"certType"`
+		CertificateHashData map[string]string `json:"certificateHashData"`
 	}
 	_ = c.ShouldBindJSON(&req)
 
 	deviceID := c.Param("deviceId")
 	_, callerID, tenantID := tenantInfo(c)
 
-	allCerts, err := repository.ListCertificates(model.RoleCSAdmin, callerID, tenantID, "")
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Find the certificate and extract hash data
-	// serialNumber is sent as uppercase hex (OCPP certificateHashData).
 	var certHashData map[string]string
-	for _, cert := range allCerts {
-		if cert.Name == req.CertName {
-			certHashData = map[string]string{
-				"hashAlgorithm":  cert.HashAlgorithm,
-				"issuerNameHash": cert.IssuerNameHash,
-				"issuerKeyHash":  cert.IssuerKeyHash,
-				"serialNumber":   repository.CertSerialToHex(cert.SerialNumber),
-			}
-			if req.CertType == "" {
-				req.CertType = cert.Type
-			}
-			break
+	if len(req.CertificateHashData) > 0 {
+		// Direct hash data from the device's GetInstalledCertificateIds response.
+		certHashData = map[string]string{
+			"hashAlgorithm":  req.CertificateHashData["hashAlgorithm"],
+			"issuerNameHash": req.CertificateHashData["issuerNameHash"],
+			"issuerKeyHash":  req.CertificateHashData["issuerKeyHash"],
+			"serialNumber":   repository.CertSerialToHex(req.CertificateHashData["serialNumber"]),
 		}
-	}
-	if certHashData == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "certificate not found: " + req.CertName})
-		return
+	} else {
+		// Fall back to a DB lookup by certificate name.
+		allCerts, err := repository.ListCertificates(model.RoleCSAdmin, callerID, tenantID, "")
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Find the certificate and extract hash data
+		// serialNumber is sent as uppercase hex (OCPP certificateHashData).
+		for _, cert := range allCerts {
+			if cert.Name == req.CertName {
+				certHashData = map[string]string{
+					"hashAlgorithm":  cert.HashAlgorithm,
+					"issuerNameHash": cert.IssuerNameHash,
+					"issuerKeyHash":  cert.IssuerKeyHash,
+					"serialNumber":   repository.CertSerialToHex(cert.SerialNumber),
+				}
+				if req.CertType == "" {
+					req.CertType = cert.Type
+				}
+				break
+			}
+		}
+		if certHashData == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "certificate not found: " + req.CertName})
+			return
+		}
 	}
 
 	// OCPP 2.0.1: native DeleteCertificate (M04)
